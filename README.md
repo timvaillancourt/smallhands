@@ -1,7 +1,7 @@
 # smallhands
 A simple load generator for MongoDB using mentions of @realDonaldTrump  via the Twitter Streaming API.
 
-["make run"](https://github.com/timvaillancourt/smallhands/blob/master/screenshots/run.png)
+!["make run"](https://github.com/timvaillancourt/smallhands/blob/master/screenshots/run.png)
 
 ## Required
 1. A Twitter account
