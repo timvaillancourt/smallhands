@@ -57,7 +57,7 @@ class SmallhandsListener(StreamListener):
 	def on_error(self, e):
 		if self.db_conn:
 			self.db_conn.close()
-		return SmallhandsError("Error fetching tweets: '%s'" % e)
+		return SmallhandsError("Twitter error fetching tweets: '%s'" % e)
 
 
 class SmallhandsConfig(BaseConfiguration):
@@ -83,7 +83,7 @@ class Smallhands():
 
 		# Parse twitter-stream filters
 		self.stream_filters = ["@realDonaldTrump"]
-		if 'twitter' in self.config and 'filters' in self.config.twitter:
+		if 'filters' in self.config.twitter:
 			self.stream_filters = self.config.twitter.filters.split(",")
 		if len(self.stream_filters) < 1:
 			SmallhandsError("No Twitter stream filters!", True)
@@ -119,15 +119,20 @@ class Smallhands():
 				config.db.port = 27017
 
 			# Required fields
-			required = [
-				config.twitter.access.key,
-				config.twitter.access.secret,
-				config.twitter.consumer.key,
-				config.twitter.consumer.secret
-			]
-			for field in required:
-				if not field:
-					raise Exception, 'Required config field "%s" not specified!' % field, None
+			if 'twitter' in config:
+				required = [
+					config.twitter.access.key,
+					config.twitter.access.secret,
+					config.twitter.consumer.key,
+					config.twitter.consumer.secret
+				]
+				for field in required:
+					try:
+						field
+					except Exception, e:
+						raise Exception, 'Required config field "%s" not specified!' % field, None
+			else:
+				raise Exception, 'Required "twitter" auth key/secret info not set! Please set via config file or command line!', None
 			return config
 		except Exception, e:
 			SmallhandsError(e, True)
