@@ -3,9 +3,13 @@ A simple load generator for MongoDB using mentions of @realDonaldTrump as a sour
 
 ## Required
 1. A Twitter account
-2. A set of "Twitter Apps" keys (*Consumer Key+Secret and Access Key+Secret*). Receive keys via registering an "app" at https://apps.twitter.com
+2. A set of read-only "Twitter Apps" keys (*See: Twitter Apps Keys steps below*)
 3. Python 2.7 (*Python 2.6 and 3.x not tested*)
 4. Pip dependencies specified in 'requirements.txt'
+
+### Twitter Apps Keys
+
+Smallhands requires Twitter API auth keys. You will need to register a new read-only "app" at https://apps.twitter.com to get a set of Consumer and Access auth key pairs.
 
 ## Getting Started
 ```
