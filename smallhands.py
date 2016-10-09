@@ -31,7 +31,7 @@ class SmallhandsListener(StreamListener):
 			self.db['tweets'].insert(tweet)
 			self.count += 1
 			if (self.count % 50) == 0:
-				print "Wrote %i tweets" % self.count
+				print "Wrote 50 tweets (total: %i)" % self.count
 		except Exception, e:
 			return SmallhandsError(e)
 
