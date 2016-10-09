@@ -21,22 +21,9 @@ class SmallhandsError():
 
 
 class SmallhandsListener(StreamListener):
-	def __init__(self, config):
-		self.config = config
+	def __init__(self, db):
+		self.db     = db
 		self.count  = 0
-		try:
-			self.db_conn = MongoClient(
-				self.config.db.host,
-				self.config.db.port
-			)
-			if 'user' in self.config.db and 'password' in self.config.db:
-				self.db_conn[self.config.db.authdb].authenticate(
-					self.config.db.user,
-					self.config.db.password
-				)
-			self.db = self.db_conn[self.config.db.name]
-		except Exception, e:
-			return SmallhandsError(e, True)
 
 	def write_nonsense(self, data):
 		try:
@@ -55,8 +42,6 @@ class SmallhandsListener(StreamListener):
 			return SmallhandsError(e)
 		
 	def on_error(self, e):
-		if self.db_conn:
-			self.db_conn.close()
 		return SmallhandsError("Twitter error fetching tweets: '%s'" % e)
 
 
@@ -77,8 +62,9 @@ class SmallhandsConfig(BaseConfiguration):
 		return parser
 
 class Smallhands():
-	def __init__(self, cmdline_args):
-		self.config = self.parse_config(cmdline_args)
+	def __init__(self):
+		self.config  = self.parse_config()
+		self.db_conn = None
 
 		# Parse twitter-stream filters
 		self.stream_filters = ["@realDonaldTrump"]
@@ -88,7 +74,24 @@ class Smallhands():
 			SmallhandsError("No Twitter stream filters!", True)
 
 		print("# Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
-		print("# Enjoying the tool? No thanks necessary, just vote: www.rockthevote.com!\n")
+		print("# Vote (if you can): www.rockthevote.com!!!\n")
+
+	def get_db(self):
+		try:
+			self.db_conn = MongoClient(
+				self.config.db.host,
+				self.config.db.port
+			)
+			db = self.db_conn[self.config.db.name]
+			if 'user' in self.config.db and 'password' in self.config.db:
+				db.authenticate(
+					self.config.db.user,
+					self.config.db.password,
+					source=self.config.db.authdb
+				)
+			return db
+		except Exception, e:
+			return SmallhandsError(e, True)
 
 	def get_twitter_auth(self):
 		try:
@@ -104,10 +107,10 @@ class Smallhands():
 		except Exception, e:
 			SmallhandsError(e, True)
 
-	def parse_config(self, cmdline_args):
+	def parse_config(self):
 		try:
 			config = SmallhandsConfig()
-			config.parse(cmdline_args)
+			config.parse(sys.argv[1:])
 
 			# Set defaults:
 			if 'name' not in config.db:
@@ -139,12 +142,13 @@ class Smallhands():
 	def start(self):
 		# Start the stream
 		try:
+			db   = self.get_db()
 			auth = self.get_twitter_auth()
 			if auth:
-				twitterStream = Stream(auth, SmallhandsListener(self.config))
+				twitterStream = Stream(auth, SmallhandsListener(db))
+				twitterStream.filter(track=self.stream_filters)
 		except Exception, e:
 			SmallhandsError(e, True)
-		twitterStream.filter(track=self.stream_filters)
 
 if __name__ == "__main__":
-	Smallhands(sys.argv[1:]).start()
+	Smallhands().start()
