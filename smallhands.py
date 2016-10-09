@@ -74,8 +74,7 @@ class SmallhandsConfig(BaseConfiguration):
 		parser.add_argument("-T", "--twitter-access-token", dest="twitter.access.token", help="Twitter Access Token (REQUIRED)")
 		parser.add_argument("-S", "--twitter-access-secret", dest="twitter.access.secret", help="Twitter Access Secret (REQUIRED)")
 		parser.add_argument("-F", "--twitter-filters", dest="twitter.filters", help="Comma-separated list of filters to Twitter stream (default: @realDonaldTrump)")
-		self._parser = parser
-		return self._parser
+		return parser
 
 class Smallhands():
 	def __init__(self, cmdline_args):
@@ -128,7 +127,7 @@ class Smallhands():
 				]
 				for field in required:
 					try:
-						field
+						test = field
 					except Exception, e:
 						raise Exception, 'Required config field "%s" not specified!' % field, None
 			else:
