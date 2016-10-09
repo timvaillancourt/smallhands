@@ -1,0 +1,15 @@
+production:
+  db:
+    host: localhost
+    port: 27017
+    #user: mongouser
+    #password: mongopass
+    #authdb: admin
+  twitter:
+    consumer:
+      key: consumer-key-required-here
+      secret: consumer-secret-required-here
+    access:
+      key: access-key-required-here
+      secret: access-secret-required-here
+    filters: "@realDonaldTrump"
