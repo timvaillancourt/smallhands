@@ -1,11 +1,14 @@
 # smallhands
 A simple load generator for MongoDB using mentions of @realDonaldTrump  via the Twitter Streaming API.
 
+["make run"](https://github.com/timvaillancourt/smallhands/blob/master/screenshots/run.png)
+
 ## Required
 1. A Twitter account
 2. A set of read-only "Twitter Apps" keys (*See: Twitter Apps Keys steps below*)
 3. Python 2.7 (*Python 2.6 and 3.x not tested*)
-4. Pip dependencies specified in 'requirements.txt'
+4. Python 'json' and 'pip' modules
+5. Pip dependencies specified in 'requirements.txt'
 
 ### Twitter Apps Keys
 
