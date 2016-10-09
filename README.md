@@ -12,7 +12,7 @@ A simple load generator for MongoDB using mentions of @realDonaldTrump as a sour
 make
 cp example.yml config.yml
 # (edit config.yml for your situation)
-python ./smallhands.py -c config.yml
+make run
 ```
 
 ## The Future...
