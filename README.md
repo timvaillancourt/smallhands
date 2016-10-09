@@ -20,8 +20,9 @@ make run
 ```
 
 ## The Future...
-1. Better errors/handling
-2. Separate fetching and writing threads
+1. Better, trump-themed errors/handling
+2. Separate fetching and writing thread(s)
+3. Optional TTL expiry on Tweets (*using MongoDB TTL Index*)
 
 ##  Code
 I beat Python with a hammer until it works. Your improvements are appreciated!

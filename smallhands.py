@@ -14,7 +14,7 @@ __VERSION__ = "0.0.1"
 
 class SmallhandsError():
 	def __init__(self, error, do_exit=False):
-		print("I know errors, I've got the best errors:\t\"%s\"" % error)
+		print("I know errors. I've got the best errors:\t\"%s\"" % error)
 		if do_exit:
 			exit(1)
 		return False
