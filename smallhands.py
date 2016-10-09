@@ -25,22 +25,16 @@ class SmallhandsListener(StreamListener):
 		self.db     = db
 		self.count  = 0
 
-	def write_nonsense(self, data):
+	def on_data(self, data):
 		try:
-			self.db['tweets'].insert(data)
+			tweet = json.loads(data)
+			self.db['tweets'].insert(tweet)
 			self.count += 1
 			if (self.count % 50) == 0:
 				print "Wrote %i tweets" % self.count
 		except Exception, e:
 			return SmallhandsError(e)
 
-	def on_data(self, data):
-		try:
-			decoded = json.loads(data)
-			return self.write_nonsense(decoded)
-		except Exception, e:
-			return SmallhandsError(e)
-		
 	def on_error(self, e):
 		return SmallhandsError("Twitter error fetching tweets: '%s'" % e)
 
