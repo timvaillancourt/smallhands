@@ -1,5 +1,5 @@
 # smallhands
-A simple load generator for MongoDB using mentions of @realDonaldTrump as a source w/Twitter Streaming API.
+A simple load generator for MongoDB using mentions of @realDonaldTrump  via the Twitter Streaming API.
 
 ## Required
 1. A Twitter account
