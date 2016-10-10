@@ -5,9 +5,9 @@ production:
     #user: mongouser
     #password: mongopass
     #authdb: admin
-    #expire:
-    #  min: 172800
-    #  max: 432000
+    expire:
+      min_secs: 172800
+      max_secs: 432000
   twitter:
     consumer:
       key: consumer-key-required-here

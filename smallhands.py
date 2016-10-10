@@ -11,7 +11,7 @@ from yconf import BaseConfiguration
 import json
 import sys
 
-__VERSION__ = "0.0.1"
+__VERSION__ = "0.2"
 	
 
 class SmallhandsError():
@@ -29,11 +29,25 @@ class SmallhandsListener(StreamListener):
 		self.count  = 0
 
 	def parse_tweet(self, data):
+		parsed = data
+	        if isinstance(data, dict):
+	                parsed = {}
+	                for key in data:
+				# Parse "created_at" fields to real dates
+	                        if key == "created_at":
+	                                data[key] = parser.parse(data[key])
+	                        parsed[key] = self.parse_tweet(data[key])
+	        elif isinstance(data, list):
+	                parsed = []
+	                for item in data:
+	                        parsed.append(self.parse_tweet(item))
+	        return parsed
+
+	def process_tweet(self, data):
 		try:
-			tweet = json.loads(data)
-			if 'created_at' in tweet:
-				tweet['created_at'] = parser.parse(tweet['created_at'])
-				if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
+			tweet = self.parse_tweet(json.loads(data))
+			if 'created_at' in tweet and 'expire' in self.config.db:
+				if 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
 					ttl_secs = randint(self.config.db.expire.min_secs, self.config.db.expire.max_secs)
 					tweet['expire_at'] = tweet['created_at'] + timedelta(seconds=ttl_secs)
 			return tweet
@@ -42,7 +56,7 @@ class SmallhandsListener(StreamListener):
 
 	def on_data(self, data):
 		try:
-			tweet = self.parse_tweet(data)
+			tweet = self.process_tweet(data)
 			self.db['tweets'].insert(tweet)
 			self.count += 1
 			if (self.count % 50) == 0:
@@ -86,6 +100,7 @@ class Smallhands():
 			SmallhandsError("No Twitter stream filters!", True)
 
 		print("# Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
+		print("#   \"We're going to make load testing great again. Believe me.\"")
 		print("# Vote (if you can): www.rockthevote.com!!!\n")
 
 	def get_db(self):
@@ -104,9 +119,10 @@ class Smallhands():
 					source=self.config.db.authdb
 				)
 
-			# Setup indices:
+			# Setup indices, setup TTL index conditionally:
 			db['tweets'].create_index([("id", ASCENDING), ("created_at", ASCENDING)])
-			db['tweets'].create_index([("expire_at", ASCENDING)], expireAfterSeconds=0)
+			if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
+				db['tweets'].create_index([("expire_at", ASCENDING)], expireAfterSeconds=0)
 
 			return db
 		except Exception, e:
@@ -164,6 +180,7 @@ class Smallhands():
 			db   = self.get_db()
 			auth = self.get_twitter_auth()
 			if auth:
+				print("Listening to Twitter Streaming API for mentions of: %s"  % self.stream_filters)
 				twitterStream = Stream(auth, SmallhandsListener(db, self.config))
 				twitterStream.filter(track=self.stream_filters)
 		except Exception, e:
