@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-from pymongo import MongoClient
+from dateutil import parser
+from pymongo import MongoClient, ASCENDING
 from tweepy import Stream, OAuthHandler
 from tweepy.streaming import StreamListener
 from yconf import BaseConfiguration
@@ -24,9 +25,18 @@ class SmallhandsListener(StreamListener):
 		self.db     = db
 		self.count  = 0
 
-	def on_data(self, data):
+	def parse_tweet(self, data):
 		try:
 			tweet = json.loads(data)
+			if 'created_at' in tweet:
+				tweet['created_at'] = parser.parse(tweet['created_at'])
+			return tweet
+                except Exception, e:
+                        return SmallhandsError(e)
+
+	def on_data(self, data):
+		try:
+			tweet = self.parse_tweet(data)
 			self.db['tweets'].insert(tweet)
 			self.count += 1
 			if (self.count % 50) == 0:
@@ -77,12 +87,19 @@ class Smallhands():
 				self.config.db.port
 			)
 			db = self.db_conn[self.config.db.name]
+
+			# Authentication:
 			if 'user' in self.config.db and 'password' in self.config.db:
 				db.authenticate(
 					self.config.db.user,
 					self.config.db.password,
 					source=self.config.db.authdb
 				)
+
+			# Setup indices:
+			db['tweets'].create_index([("id", ASCENDING), ("created_at", ASCENDING)])
+			db['tweets'].create_index([("expire_at", ASCENDING)], expireAfterSeconds=0)
+
 			return db
 		except Exception, e:
 			return SmallhandsError(e, True)
