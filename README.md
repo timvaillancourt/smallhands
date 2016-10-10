@@ -8,7 +8,7 @@ A simple load generator for MongoDB using mentions of @realDonaldTrump  via the 
 2. A set of read-only "Twitter Apps" keys (*See: [Twitter Apps Keys](#twitter-apps-keys) steps below*)
 3. A Percona Server for MongoDB / MongoDB instance, replset or cluster
 4. Python 2.7 (*Python 2.6 and 3.x not tested*) with 'json' and 'pip' modules
-5. Pip dependencies specified in 'requirements.txt' (*installed by "make" command*)
+5. Pip dependencies specified in 'requirements.txt' (*installed by ["make"](#getting-started) command*)
 
 ### Twitter Apps Keys
 
@@ -16,6 +16,8 @@ Smallhands requires Twitter API auth keys. You will need to register a new read-
 
 ## Getting Started
 ```
+git clone https://github.com/timvaillancourt/smallhands
+cd smallhands
 make
 cp example.yml config.yml
 # (edit config.yml for your situation)
