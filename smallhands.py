@@ -99,7 +99,7 @@ class Smallhands():
 			)
 			return auth
 		except Exception, e:
-			SmallhandsError(e, True)
+			return SmallhandsError(e, True)
 
 	def parse_config(self):
 		try:
@@ -131,7 +131,7 @@ class Smallhands():
 				raise Exception, 'Required "twitter" auth key/secret info not set! Please set via config file or command line!', None
 			return config
 		except Exception, e:
-			SmallhandsError(e, True)
+			return SmallhandsError(e, True)
 
 	def start(self):
 		# Start the stream
@@ -142,7 +142,8 @@ class Smallhands():
 				twitterStream = Stream(auth, SmallhandsListener(db))
 				twitterStream.filter(track=self.stream_filters)
 		except Exception, e:
-			SmallhandsError(e, True)
+			return SmallhandsError(e, True)
+
 
 if __name__ == "__main__":
 	Smallhands().start()
