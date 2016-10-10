@@ -33,7 +33,6 @@ class SmallhandsListener(StreamListener):
 	        if isinstance(data, dict):
 	                parsed = {}
 	                for key in data:
-				# Parse "created_at" fields to real dates
 	                        if key == "created_at":
 	                                data[key] = parser.parse(data[key])
 	                        parsed[key] = self.parse_tweet(data[key])
@@ -100,7 +99,7 @@ class Smallhands():
 			SmallhandsError("No Twitter stream filters!", True)
 
 		print("# Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
-		print("#   \"We're going to make load testing great again. Believe me.\"")
+		print("#   \"I'm going to make database testing great again. Believe me.\"")
 		print("# Vote (if you can): www.rockthevote.com!!!\n")
 
 	def get_db(self):
