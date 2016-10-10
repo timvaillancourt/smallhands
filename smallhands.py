@@ -55,6 +55,7 @@ class SmallhandsConfig(BaseConfiguration):
 		parser.add_argument("-F", "--twitter-filters", dest="twitter.filters", help="Comma-separated list of filters to Twitter stream (default: @realDonaldTrump)")
 		return parser
 
+
 class Smallhands():
 	def __init__(self):
 		self.config  = self.parse_config()
