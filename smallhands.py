@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
+from datetime import timedelta
 from dateutil import parser
 from pymongo import MongoClient, ASCENDING
+from random import randint
 from tweepy import Stream, OAuthHandler
 from tweepy.streaming import StreamListener
 from yconf import BaseConfiguration
@@ -21,8 +23,9 @@ class SmallhandsError():
 
 
 class SmallhandsListener(StreamListener):
-	def __init__(self, db):
+	def __init__(self, db, config):
 		self.db     = db
+		self.config = config
 		self.count  = 0
 
 	def parse_tweet(self, data):
@@ -30,6 +33,9 @@ class SmallhandsListener(StreamListener):
 			tweet = json.loads(data)
 			if 'created_at' in tweet:
 				tweet['created_at'] = parser.parse(tweet['created_at'])
+				if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
+					ttl_secs = randint(self.config.db.expire.min_secs, self.config.db.expire.max_secs)
+					tweet['expire_at'] = tweet['created_at'] + timedelta(seconds=ttl_secs)
 			return tweet
                 except Exception, e:
                         return SmallhandsError(e)
@@ -56,7 +62,9 @@ class SmallhandsConfig(BaseConfiguration):
 		parser.add_argument("-D", "--db-name", dest="db.name", help="MongoDB Database name (default: smallhands)")
 		parser.add_argument("-u", "--db-user", dest="db.user", help="(Optional) MongoDB Username")
 		parser.add_argument("-p", "--db-password", dest="db.password", help="(Optional) MongoDB Password")
-		parser.add_argument("-d", "--db-authdb", dest="db.authdb", default="admin", help="MongoDB Authentication Database (default: admin)")
+		parser.add_argument("-d", "--db-authdb", dest="db.authdb", help="MongoDB Authentication Database (default: admin)")
+		parser.add_argument("-x", "--db-expire-min", dest="db.expire.min", type=int, help="(Optional) minimum MongoDB TTL expiry in seconds")
+		parser.add_argument("-X", "--db-expire-max", dest="db.expire.max", type=int, help="(Optional) maximum MongoDB TTL expiry in seconds")
 		parser.add_argument("-k", "--twitter-consumer-key", dest="twitter.consumer.key", help="Twitter Consumer Key (REQUIRED)")
 		parser.add_argument("-s", "--twitter-consumer-secret", dest="twitter.consumer.secret", help="Twitter Consumer Secret (REQUIRED)")
 		parser.add_argument("-T", "--twitter-access-token", dest="twitter.access.token", help="Twitter Access Token (REQUIRED)")
@@ -156,7 +164,7 @@ class Smallhands():
 			db   = self.get_db()
 			auth = self.get_twitter_auth()
 			if auth:
-				twitterStream = Stream(auth, SmallhandsListener(db))
+				twitterStream = Stream(auth, SmallhandsListener(db, self.config))
 				twitterStream.filter(track=self.stream_filters)
 		except Exception, e:
 			return SmallhandsError(e, True)
