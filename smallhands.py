@@ -188,7 +188,7 @@ class Smallhands():
 			twitterStream = Stream(auth, SmallhandsListener(db, self.config))
 			twitterStream.filter(track=self.stream_filters, async=True)
 		except Exception, e:
-			return SmallhandsError(e, True)
+			return SmallhandsError("Error with Twitter Streaming: %s" % e, True)
 
 
 if __name__ == "__main__":
