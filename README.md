@@ -6,9 +6,9 @@ A simple load generator for MongoDB using mentions of @realDonaldTrump  via the 
 ## Required
 1. A Twitter account
 2. A set of read-only "Twitter Apps" keys (*See: Twitter Apps Keys steps below*)
-3. Python 2.7 (*Python 2.6 and 3.x not tested*)
-4. Python 'json' and 'pip' modules
-5. Pip dependencies specified in 'requirements.txt'
+3. A Percona Server for MongoDB / MongoDB instance, replset or cluster
+4. Python 2.7 (*Python 2.6 and 3.x not tested*) with 'json' and 'pip' modules
+5. Pip dependencies specified in 'requirements.txt' (*installed by "make" command*)
 
 ### Twitter Apps Keys
 
@@ -26,6 +26,7 @@ make run
 1. Better, trump-themed errors/handling
 2. Separate fetching and writing thread(s)
 3. Optional TTL expiry on Tweets (*using MongoDB TTL Index*)
+4. Install steps and indices for sharded deployment
 
 ##  Code
 I beat Python with a hammer until it works. Your improvements are appreciated!
