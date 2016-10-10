@@ -19,7 +19,6 @@ class SmallhandsError():
 		print("I know errors. I've got the best errors:\t\"%s\"" % error)
 		if do_exit:
 			sys.exit(1)
-		return False
 
 
 class SmallhandsListener(StreamListener):
@@ -29,18 +28,21 @@ class SmallhandsListener(StreamListener):
 		self.count  = 0
 
 	def parse_tweet(self, data):
-		parsed = data
-	        if isinstance(data, dict):
-	                parsed = {}
-	                for key in data:
-	                        if key == "created_at":
-	                                data[key] = parser.parse(data[key])
-	                        parsed[key] = self.parse_tweet(data[key])
-	        elif isinstance(data, list):
-	                parsed = []
-	                for item in data:
-	                        parsed.append(self.parse_tweet(item))
-	        return parsed
+		try:
+			parsed = data
+		        if isinstance(data, dict):
+		                parsed = {}
+		                for key in data:
+		                        if key == "created_at":
+		                                data[key] = parser.parse(data[key])
+		                        parsed[key] = self.parse_tweet(data[key])
+		        elif isinstance(data, list):
+		                parsed = []
+		                for item in data:
+		                        parsed.append(self.parse_tweet(item))
+		        return parsed
+                except Exception, e:
+                        return SmallhandsError("Error parsing tweet: %s" % e)
 
 	def process_tweet(self, data):
 		try:
@@ -51,20 +53,23 @@ class SmallhandsListener(StreamListener):
 					tweet['expire_at'] = tweet['created_at'] + timedelta(seconds=ttl_secs)
 			return tweet
                 except Exception, e:
-                        return SmallhandsError(e)
+                        return SmallhandsError("Error processing tweet: %s" % e)
 
 	def on_data(self, data):
+		tweet = self.process_tweet(data)
 		try:
-			tweet = self.process_tweet(data)
 			self.db['tweets'].insert(tweet)
 			self.count += 1
 			if (self.count % 50) == 0:
 				print "Wrote 50 tweets (total: %i)" % self.count
 		except Exception, e:
-			return SmallhandsError(e)
+			return SmallhandsError("Error writing tweet to db: %s" % e)
 
 	def on_error(self, e):
-		return SmallhandsError("Twitter error fetching tweets: '%s'" % e)
+		msg = e
+		if e == 401:
+			msg = "Unauthorized: Authentication credentials were missing or incorrect."
+		return SmallhandsError("Twitter Streaming API error: '%s'" % msg, True)
 
 
 class SmallhandsConfig(BaseConfiguration):
@@ -125,7 +130,7 @@ class Smallhands():
 
 			return db
 		except Exception, e:
-			return SmallhandsError(e, True)
+			return SmallhandsError("Error setting up db: %s" % e, True)
 
 	def get_twitter_auth(self):
 		try:
@@ -139,7 +144,7 @@ class Smallhands():
 			)
 			return auth
 		except Exception, e:
-			return SmallhandsError(e, True)
+			return SmallhandsError("Error with Twitter auth: %s" % e, True)
 
 	def parse_config(self):
 		try:
@@ -171,17 +176,17 @@ class Smallhands():
 				raise Exception, 'Required "twitter" auth key/secret info not set! Please set via config file or command line!', None
 			return config
 		except Exception, e:
-			return SmallhandsError(e, True)
+			return SmallhandsError("Error parsing config: %s" % e, True)
 
 	def start(self):
+		db   = self.get_db()
+		auth = self.get_twitter_auth()
+
 		# Start the stream
 		try:
-			db   = self.get_db()
-			auth = self.get_twitter_auth()
-			if auth:
-				print("Listening to Twitter Streaming API for mentions of: %s"  % self.stream_filters)
-				twitterStream = Stream(auth, SmallhandsListener(db, self.config))
-				twitterStream.filter(track=self.stream_filters)
+			print("Listening to Twitter Streaming API for mentions of: %s"  % self.stream_filters)
+			twitterStream = Stream(auth, SmallhandsListener(db, self.config))
+			twitterStream.filter(track=self.stream_filters, async=True)
 		except Exception, e:
 			return SmallhandsError(e, True)
 
