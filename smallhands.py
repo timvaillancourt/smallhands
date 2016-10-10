@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
-from tweepy import Stream
-from tweepy import OAuthHandler
-from tweepy.streaming import StreamListener
 from pymongo import MongoClient
+from tweepy import Stream, OAuthHandler
+from tweepy.streaming import StreamListener
 from yconf import BaseConfiguration
 
 import json
@@ -16,7 +15,7 @@ class SmallhandsError():
 	def __init__(self, error, do_exit=False):
 		print("I know errors. I've got the best errors:\t\"%s\"" % error)
 		if do_exit:
-			exit(1)
+			sys.exit(1)
 		return False
 
 
