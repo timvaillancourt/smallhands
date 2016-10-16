@@ -4,6 +4,7 @@ from datetime import timedelta
 from dateutil import parser
 from pymongo import MongoClient, ASCENDING
 from random import randint
+from time import sleep
 from tweepy import Stream, OAuthHandler
 from tweepy.streaming import StreamListener
 from yconf import BaseConfiguration
@@ -68,8 +69,18 @@ class SmallhandsListener(StreamListener):
 	def on_error(self, e):
 		msg = e
 		if e == 401:
-			msg = "Unauthorized: Authentication credentials were missing or incorrect."
+			msg = "401 Unauthorized: Authentication credentials were missing or incorrect"
+		elif e == 420:
+			msg = "420 Rate limiting"
+			return sleep(3)
+		elif e == 429:
+			msg = "429 Too Many Requests"
+			return sleep(5)
 		return SmallhandsError("Twitter Streaming API error: '%s'" % msg, True)
+
+	def on_exception(self, exception):
+		print 'got exception: %s' % exception
+		sleep(1)
 
 
 class SmallhandsConfig(BaseConfiguration):
@@ -95,6 +106,7 @@ class Smallhands():
 	def __init__(self):
 		self.config  = self.parse_config()
 		self.db_conn = None
+		self.active_streams = []
 
 		# Parse twitter-stream filters
 		self.stream_filters = ["@realDonaldTrump"]
@@ -185,11 +197,35 @@ class Smallhands():
 		# Start the stream
 		try:
 			print("Listening to Twitter Streaming API for mentions of: %s"  % self.stream_filters)
-			twitterStream = Stream(auth, SmallhandsListener(db, self.config))
-			twitterStream.filter(track=self.stream_filters, async=True)
+			stream = Stream(auth, SmallhandsListener(db, self.config))
+			stream.filter(track=self.stream_filters, async=True)
+			self.active_streams.append(stream)
+			return self.wait_streams()
 		except Exception, e:
 			return SmallhandsError("Error with Twitter Streaming: %s" % e, True)
 
+	def wait_streams(self):
+		while len(self.active_streams) > 0:
+			for stream in self.active_streams:
+				if not stream.running:
+					self.active_streams.remove(stream)
+				else:
+					sleep(1)
+
+	def stop(self):
+		print("\nStopping stream and exiting Smallhands. Sad!")
+		if len(self.active_streams) > 0:
+			for stream in self.active_streams:
+				stream.disconnect()
+			self.wait_streams()
+		if self.db_conn:
+			self.db_conn.close()
+
 
 if __name__ == "__main__":
-	Smallhands().start()
+	try:
+		smallhands = Smallhands()
+		smallhands.start()
+	except:
+		if smallhands:
+			smallhands.stop()
