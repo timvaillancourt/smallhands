@@ -14,6 +14,10 @@ A simple load generator for MongoDB using mentions of @realDonaldTrump  via the 
 
 Smallhands requires Twitter API auth keys. You will need to register a new read-only "app" at https://apps.twitter.com to get a set of Consumer and Access auth key pairs.
 
+## Disclaimer
+
+The test data is likely to contain sexist, racist and generally offensive or incorrect statements.
+
 ## Getting Started
 ```
 git clone https://github.com/timvaillancourt/smallhands
