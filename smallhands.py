@@ -66,7 +66,7 @@ class SmallhandsListener(StreamListener):
 				self.db['users'].update_one({ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }, upsert=True)
 			self.count += 1
 			if (self.count % 50) == 0:
-				print "Wrote 50 tweets (total: %i)" % self.count
+				print("Wrote 50 tweets (total: %i)" % self.count)
 		except Exception, e:
 			if not e.message.startswith("E11000 duplicate key"):
 				return SmallhandsError("Error writing tweet to db: %s" % e)
@@ -84,7 +84,7 @@ class SmallhandsListener(StreamListener):
 		return SmallhandsError("Twitter Streaming API error: '%s'" % msg, True)
 
 	def on_exception(self, exception):
-		print 'got exception: %s' % exception
+		print('got exception: %s' % exception)
 		sleep(1)
 
 
@@ -156,7 +156,7 @@ class Smallhands():
 
 			# Setup indices, setup TTL index conditionally:
 			if self.db_conn.is_mongos:
-				print "Detected 'mongos' process, enabling sharding of smallhands documents"
+				print("Detected 'mongos' process, enabling sharding of smallhands documents")
 
 				try:
 					db = self.db_conn['admin']
@@ -171,6 +171,7 @@ class Smallhands():
 					for shard in db.shards.find():
 						shard_conn = MongoClient(shard['host'])
 						self.auth_conn(shard_conn)
+						print("\tEnabling indices on shard: %s" % shard['host'])
 						for collection in ['tweets', 'users']:
 							self.ensure_indices(shard_conn, collection, True)
 				except Exception, e:
@@ -190,6 +191,7 @@ class Smallhands():
 				db = self.db_conn[self.config.db.name]
 			else:
 				db = self.db_conn[self.config.db.name]
+				print("Enabling indices on: %s" % self.db_conn.address)
 				for collection in ['tweets', 'users']:
 					self.ensure_indices(self.db_conn, collection)
 			return db
