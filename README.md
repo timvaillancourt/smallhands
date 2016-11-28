@@ -30,7 +30,6 @@ make run
 
 ## The Future...
 1. Better, trump-themed errors/handling
-2. Install steps and indices for sharded deployment
 
 ##  Code
 I beat Python with a hammer until it works. Your improvements are appreciated!
