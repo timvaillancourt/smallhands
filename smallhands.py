@@ -61,6 +61,8 @@ class SmallhandsListener(StreamListener):
 		try:
 			self.db['tweets'].insert(tweet)
 			if 'user' in tweet:
+				if 'expire_at' in tweet:
+					tweet['user']['expire_at'] = tweet['expire_at']
 				self.db['users'].update_one({ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }, upsert=True)
 			self.count += 1
 			if (self.count % 50) == 0:
@@ -122,21 +124,35 @@ class Smallhands():
 		print("#   \"I'm going to make database testing great again. Believe me.\"")
 		print("# Vote (if you can): www.rockthevote.com!!!\n")
 
+	def auth_conn(self, conn):
+		try:
+			if 'user' in self.config.db and 'password' in self.config.db:
+				conn[self.config.db.authdb].authenticate(
+					self.config.db.user,
+					self.config.db.password,
+					source=self.config.db.authdb
+				)
+		except Exception, e:
+			raise e
+
+	def ensure_indices(self, conn, collection, sharded=False):
+		try:
+			db = conn[self.config.db.name]
+			db[collection].create_index([("id", ASCENDING)], unique=True)
+			if sharded:
+				db[collection].create_index([('id', HASHED)])
+			if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
+				db[collection].create_index([("expire_at", ASCENDING)], expireAfterSeconds=0)
+		except Exception, e:
+			raise e
+
 	def get_db(self):
 		try:
 			self.db_conn = MongoClient(
 				self.config.db.host,
 				self.config.db.port
 			)
-			db = self.db_conn[self.config.db.name]
-
-			# Authentication:
-			if 'user' in self.config.db and 'password' in self.config.db:
-				db.authenticate(
-					self.config.db.user,
-					self.config.db.password,
-					source=self.config.db.authdb
-				)
+			self.auth_conn(self.db_conn)
 
 			# Setup indices, setup TTL index conditionally:
 			if self.db_conn.is_mongos:
@@ -154,40 +170,28 @@ class Smallhands():
 					db = self.db_conn['config']
 					for shard in db.shards.find():
 						shard_conn = MongoClient(shard['host'])
-					        if 'user' in self.config.db and 'password' in self.config.db:
-							shard_db = shard_conn[self.config.db.authdb]
-                                			shard_db.authenticate(
-		                                	        self.config.db.user,
-                		                        	self.config.db.password,
-	                                		        source=self.config.db.authdb
-			                                )
-						shard_db = shard_conn[self.config.db.name]
-						shard_db['tweets'].create_index([("id", ASCENDING)], unique=True)
-						shard_db['users'].create_index([("id", ASCENDING)], unique=True)
-						shard_db['tweets'].create_index([('id', HASHED)])
-						shard_db['users'].create_index([('id', HASHED)])
-						if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
-							shard_db['tweets'].create_index([("expire_at", ASCENDING)], expireAfterSeconds=0)
+						self.auth_conn(shard_conn)
+						for collection in ['tweets', 'users']:
+							self.ensure_indices(shard_conn, collection, True)
 				except Exception, e:
 					raise e
 				finally:
 					if shard_conn:
 						shard_conn.close()
 
-				try:
-					db = self.db_conn['admin']
-					db.command({ 'shardCollection': '%s.tweets' % self.config.db.name, 'key': { 'id': HASHED } })
-					db.command({ 'shardCollection': '%s.users' % self.config.db.name, 'key': { 'id': HASHED } })
-				except Exception, e:
-					if not e.message.startswith("sharding already enabled for collection"):
-						raise e
+				for collection in ['tweets', 'users']:
+					try:
+						db = self.db_conn['admin']
+						db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': HASHED } })
+					except Exception, e:
+						if not e.message.startswith("sharding already enabled for collection"):
+							raise e
 
 				db = self.db_conn[self.config.db.name]
 			else:
-				db['tweets'].create_index([("id", ASCENDING)], unique=True)
-				db['users'].create_index([("id", ASCENDING)], unique=True)
-				if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
-					db['tweets'].create_index([("expire_at", ASCENDING)], expireAfterSeconds=0)
+				db = self.db_conn[self.config.db.name]
+				for collection in ['tweets', 'users']:
+					self.ensure_indices(self.db_conn, collection)
 			return db
 		except Exception, e:
 			return SmallhandsError("Error setting up db: %s" % e, True)
