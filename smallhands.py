@@ -133,7 +133,7 @@ class Smallhands():
 					source=self.config.db.authdb
 				)
 		except Exception, e:
-			raise e
+			return SmallhandsError("Error authenticating to: %s - %s" % (conn.address, e))
 
 	def ensure_indices(self, conn, collection, sharded=False):
 		try:
@@ -144,7 +144,7 @@ class Smallhands():
 			if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
 				db[collection].create_index([("expire_at", ASCENDING)], expireAfterSeconds=0)
 		except Exception, e:
-			raise e
+			return SmallhandsError("Error creating collections on: %s.%s - %s" % (self.config.db.name, collection, e))
 
 	def get_db(self):
 		try:
