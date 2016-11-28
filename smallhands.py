@@ -12,7 +12,7 @@ from yconf import BaseConfiguration
 import json
 import sys
 
-__VERSION__ = "0.2"
+__VERSION__ = "0.3"
 	
 
 class SmallhandsError():
