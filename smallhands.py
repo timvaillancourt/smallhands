@@ -144,13 +144,13 @@ class SmallhandsInserter(Process):
     def run(self):
         print "[%i] Started SmallhandsInserter thread! Tremendous!" % os.getpid()
         self.conn = SmallhandsDB(self.config).connection()
-        self.db = self.conn['smallhands']
+        self.db = self.conn[self.config.db.name]
         while True:
             try:
                 self.db['tweets'].insert(self.q.get())
                 self.count += 1
                 if (self.count % 50) == 0:
-                    print("[%i] Inserted 50 tweets to smallhands.tweets (total: %i, queue size: %i)" % (os.getpid(), self.count, self.q.qsize()))
+                    print("[%i] Inserted 50 tweets to %s.tweets (total: %i, queue size: %i)" % (os.getpid(), self.config.db.name, self.count, self.q.qsize()))
             except errors.DuplicateKeyError:
                 continue
 
@@ -165,7 +165,7 @@ class SmallhandsUpdater(Process):
     def run(self):
         print "[%i] Started SmallhandsUpdater thread! Tremendous!" % os.getpid()
         self.conn = SmallhandsDB(self.config).connection()
-        self.db = self.conn['smallhands']
+        self.db = self.conn[self.config.db.name]
         while True:
             try:
                 item = self.q.get()
@@ -175,7 +175,7 @@ class SmallhandsUpdater(Process):
                     self.db['users'].update(find, updt, upsert=True)
                     self.count += 1
                     if (self.count % 50) == 0:
-                        print("[%i] Updated 50 users to smallhands.users (total: %i, queue size: %i)" % (os.getpid(), self.count, self.q.qsize()))
+                        print("[%i] Updated 50 users to %s.users (total: %i, queue size: %i)" % (os.getpid(), self.config.db.name, self.count, self.q.qsize()))
             except Exception, e:
                 raise e
 
