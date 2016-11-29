@@ -2,7 +2,8 @@
 
 from datetime import timedelta
 from dateutil import parser
-from pymongo import MongoClient, ASCENDING, HASHED
+from multiprocessing import Pool, Process, Queue
+from pymongo import errors, MongoClient, ASCENDING, HASHED
 from random import randint
 from time import sleep
 from tweepy import Stream, OAuthHandler
@@ -10,10 +11,11 @@ from tweepy.streaming import StreamListener
 from yconf import BaseConfiguration
 
 import json
+import os
 import sys
 
-__VERSION__ = "0.3"
-    
+__VERSION__ = "0.4"
+
 
 class SmallhandsError():
     def __init__(self, error, do_exit=False):
@@ -23,9 +25,10 @@ class SmallhandsError():
 
 
 class SmallhandsListener(StreamListener):
-    def __init__(self, db, config):
+    def __init__(self, db, config, queues):
         self.db     = db
         self.config = config
+        self.queues = queues
         self.count  = 0
 
     def parse_tweet(self, data):
@@ -59,14 +62,14 @@ class SmallhandsListener(StreamListener):
     def on_data(self, data):
         tweet = self.process_tweet(data)
         try:
-            self.db['tweets'].insert(tweet)
+            self.queues['insert'].put(tweet)
             if 'user' in tweet:
                 if 'expire_at' in tweet:
                     tweet['user']['expire_at'] = tweet['expire_at']
-                self.db['users'].update_one({ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }, upsert=True)
+                self.queues['update'].put([{ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }])
             self.count += 1
             if (self.count % 50) == 0:
-                print("Wrote 50 tweets (total: %i)" % self.count)
+                print("[%i] Fetched 50 items from Twitter Streaming API (total: %i)" % (os.getpid(), self.count))
         except Exception, e:
             if not e.message.startswith("E11000 duplicate key"):
                 return SmallhandsError("Error writing tweet to db: %s" % e)
@@ -86,6 +89,80 @@ class SmallhandsListener(StreamListener):
     def on_exception(self, exception):
         print('got exception: %s' % exception)
         sleep(1)
+
+
+class SmallhandsDB:
+    def __init__(self, config):
+        self.config = config
+        self.conn = None
+
+    def auth_conn(self):
+        try:
+            if 'user' in self.config.db and 'password' in self.config.db:
+                self.conn[self.config.db.authdb].authenticate(
+                    self.config.db.user,
+                    self.config.db.password,
+                    source=self.config.db.authdb
+                )
+        except Exception, e:
+            return SmallhandsError("Error authenticating to: %s - %s" % (conn.address, e))
+
+    def connection(self):
+        try:
+            if not self.conn:
+                self.conn = MongoClient(
+                    self.config.db.host,
+                    self.config.db.port
+                )
+                self.auth_conn()
+            return self.conn
+        except Exception, e:
+            return SmallhandsError("Error setting up db: %s" % e, True)
+
+
+class SmallhandsInserter(Process):
+    def __init__(self, config, q):
+        self.config = config
+        self.q = q
+        self.count = 0
+        super(SmallhandsInserter, self).__init__()
+
+    def run(self):
+        print "[%i] Started SmallhandsInserter thread! Tremendous!" % os.getpid()
+        self.conn = SmallhandsDB(self.config).connection()
+        self.db = self.conn['smallhands']
+        while True:
+            try:
+                self.db['tweets'].insert(self.q.get())
+                self.count += 1
+                if (self.count % 50) == 0:
+                    print("[%i] Inserted 50 tweets to smallhands.tweets (total: %i, queue size: %i)" % (os.getpid(), self.count, self.q.qsize()))
+            except errors.DuplicateKeyError:
+                continue
+
+
+class SmallhandsUpdater(Process):
+    def __init__(self, config, q):
+        self.config = config
+        self.q = q
+        self.count = 0
+        super(SmallhandsUpdater, self).__init__()
+
+    def run(self):
+        print "[%i] Started SmallhandsUpdater thread! Tremendous!" % os.getpid()
+        self.conn = SmallhandsDB(self.config).connection()
+        self.db = self.conn['smallhands']
+        while True:
+            try:
+                item = self.q.get()
+                find = item[0]
+                updt = item[1]
+                self.db['users'].update(find, updt, upsert=True)
+                self.count += 1
+                if (self.count % 50) == 0:
+                    print("[%i] Updated 50 users to smallhands.users (total: %i, queue size: %i)" % (os.getpid(), self.count, self.q.qsize()))
+            except Exception, e:
+                raise e
 
 
 class SmallhandsConfig(BaseConfiguration):
@@ -112,6 +189,8 @@ class Smallhands():
         self.config  = self.parse_config()
         self.db_conn = None
         self.active_streams = []
+        self.queues = { 'insert': None, 'update': None }
+        self.workers = { 'insert': None, 'update': None }
 
         # Parse twitter-stream filters
         self.stream_filters = ["@realDonaldTrump"]
@@ -121,8 +200,7 @@ class Smallhands():
             SmallhandsError("No Twitter stream filters!", True)
 
         print("# Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
-        print("#   \"I'm going to make database testing great again. Believe me.\"")
-        print("# Vote (if you can): www.rockthevote.com!!!\n")
+        print("#   \"I'm going to make database testing great again. Believe me.\"\n")
 
     def auth_conn(self, conn):
         try:
@@ -250,11 +328,22 @@ class Smallhands():
         db   = self.get_db()
         auth = self.get_twitter_auth()
 
+        self.queues['insert'] = Queue()
+        self.queues['update'] = Queue()
+
+        try:
+            self.workers['insert'] = SmallhandsInserter(self.config, self.queues['insert']) 
+            self.workers['update'] = SmallhandsUpdater(self.config, self.queues['update']) 
+            self.workers['insert'].start()
+            self.workers['update'].start()
+        except Exception, e:
+            return SmallhandsError("Error starting database workers: %s" % e, True)
+
         # Start the stream
         try:
             print("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (self.stream_filters, self.config.db.host, self.config.db.port))
-            stream = Stream(auth, SmallhandsListener(db, self.config))
-            stream.filter(track=self.stream_filters, async=True)
+            stream = Stream(auth, SmallhandsListener(db, self.config, self.queues))
+            stream.filter(track=self.stream_filters)
             self.active_streams.append(stream)
             return self.wait_streams()
         except Exception, e:
