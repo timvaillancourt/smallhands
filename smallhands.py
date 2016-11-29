@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 from dateutil import parser
-from multiprocessing import Pool, Process, Queue
+from multiprocessing import Process, Queue
 from pymongo import errors, MongoClient, ASCENDING, HASHED
 from random import randint
 from time import sleep
