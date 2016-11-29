@@ -124,6 +124,11 @@ class SmallhandsDB:
         except Exception, e:
             return SmallhandsError("Error setting up db: %s" % e, True)
 
+    def is_mongos(self):
+        if self.conn:
+            return self.conn.is_mongos
+        return False
+
     def close(self):
         if self.conn:
             self.conn.close()
@@ -164,12 +169,13 @@ class SmallhandsUpdater(Process):
         while True:
             try:
                 item = self.q.get()
-                find = item[0]
-                updt = item[1]
-                self.db['users'].update(find, updt, upsert=True)
-                self.count += 1
-                if (self.count % 50) == 0:
-                    print("[%i] Updated 50 users to smallhands.users (total: %i, queue size: %i)" % (os.getpid(), self.count, self.q.qsize()))
+                if len(item) == 2:
+                    find = item[0]
+                    updt = item[1]
+                    self.db['users'].update(find, updt, upsert=True)
+                    self.count += 1
+                    if (self.count % 50) == 0:
+                        print("[%i] Updated 50 users to smallhands.users (total: %i, queue size: %i)" % (os.getpid(), self.count, self.q.qsize()))
             except Exception, e:
                 raise e
 
@@ -198,7 +204,7 @@ class Smallhands():
         self.config  = self.parse_config()
         self.db_conn = None
         self.active_streams = []
-        self.queues = { 'insert': None, 'update': None }
+        self.queues = { 'insert': Queue(), 'update': Queue() }
         self.workers = { 'insert': None, 'update': None }
 
         # Parse twitter-stream filters
@@ -227,7 +233,7 @@ class Smallhands():
             self.db_conn = SmallhandsDB(self.config).connection()
 
             # Setup indices, setup TTL index conditionally:
-            if self.db_conn.conn.is_mongos:
+            if self.db_conn.is_mongos:
                 print("Detected 'mongos' process, enabling sharding of smallhands documents")
 
                 try:
@@ -321,14 +327,9 @@ class Smallhands():
         db   = self.get_db()
         auth = self.get_twitter_auth()
 
-        self.queues['insert'] = Queue()
-        self.queues['update'] = Queue()
-
         try:
-            self.workers['insert'] = SmallhandsInserter(self.config, self.queues['insert']) 
-            self.workers['update'] = SmallhandsUpdater(self.config, self.queues['update']) 
-            self.workers['insert'].start()
-            self.workers['update'].start()
+            self.workers['insert'] = SmallhandsInserter(self.config, self.queues['insert']).start()
+            self.workers['update'] = SmallhandsUpdater(self.config, self.queues['update']).start()
         except Exception, e:
             return SmallhandsError("Error starting database workers: %s" % e, True)
 
