@@ -62,10 +62,10 @@ class SmallhandsListener(StreamListener):
     def on_data(self, data):
         tweet = self.process_tweet(data)
         try:
-            self.queues['insert'].put(tweet)
-            if 'user' in tweet:
-                if 'expire_at' in tweet:
-                    tweet['user']['expire_at'] = tweet['expire_at']
+            if 'id' in tweet:
+                self.queues['insert'].put(tweet)
+            if 'user' in tweet and 'expire_at' in tweet:
+                tweet['user']['expire_at'] = tweet['expire_at']
                 self.queues['update'].put([{ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }])
             self.count += 1
             if (self.count % 50) == 0:
