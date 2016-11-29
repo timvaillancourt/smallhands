@@ -92,9 +92,11 @@ class SmallhandsListener(StreamListener):
 
 
 class SmallhandsDB:
-    def __init__(self, config):
+    def __init__(self, config, uri=None):
         self.config = config
+        self.uri = uri
         self.conn = None
+        self.connection()
 
     def auth_conn(self):
         try:
@@ -110,14 +112,21 @@ class SmallhandsDB:
     def connection(self):
         try:
             if not self.conn:
-                self.conn = MongoClient(
-                    self.config.db.host,
-                    self.config.db.port
-                )
+                if self.uri:
+                    self.conn = MongoClient(self.uri)
+                else:
+                    self.conn = MongoClient(
+                        self.config.db.host,
+                        self.config.db.port
+                    )
                 self.auth_conn()
             return self.conn
         except Exception, e:
             return SmallhandsError("Error setting up db: %s" % e, True)
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
 
 
 class SmallhandsInserter(Process):
@@ -202,17 +211,6 @@ class Smallhands():
         print("# Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
         print("#   \"I'm going to make database testing great again. Believe me.\"\n")
 
-    def auth_conn(self, conn):
-        try:
-            if 'user' in self.config.db and 'password' in self.config.db:
-                conn[self.config.db.authdb].authenticate(
-                    self.config.db.user,
-                    self.config.db.password,
-                    source=self.config.db.authdb
-                )
-        except Exception, e:
-            return SmallhandsError("Error authenticating to: %s - %s" % (conn.address, e))
-
     def ensure_indices(self, conn, collection, sharded=False):
         try:
             db = conn[self.config.db.name]
@@ -226,14 +224,10 @@ class Smallhands():
 
     def get_db(self):
         try:
-            self.db_conn = MongoClient(
-                self.config.db.host,
-                self.config.db.port
-            )
-            self.auth_conn(self.db_conn)
+            self.db_conn = SmallhandsDB(self.config).connection()
 
             # Setup indices, setup TTL index conditionally:
-            if self.db_conn.is_mongos:
+            if self.db_conn.conn.is_mongos:
                 print("Detected 'mongos' process, enabling sharding of smallhands documents")
 
                 try:
@@ -247,8 +241,7 @@ class Smallhands():
                 try:
                     db = self.db_conn['config']
                     for shard in db.shards.find():
-                        shard_conn = MongoClient(shard['host'])
-                        self.auth_conn(shard_conn)
+                        shard_conn = SmallhandsDB(self.config, shard['host']).connection()
                         print("\tEnabling indices on shard: %s" % shard['host'])
                         for collection in ['tweets', 'users']:
                             self.ensure_indices(shard_conn, collection, True)
