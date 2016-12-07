@@ -169,7 +169,7 @@ class Smallhands():
                 try:
                     db = self.db_conn['config']
                     for shard in db.shards.find():
-                        shard_conn = MongoClient(shard['host'])
+                        shard_conn = MongoClient(shard['host'], replicaSet=shard['_id'], readPreference='primary')
                         self.auth_conn(shard_conn)
                         print("\tEnabling indices on shard: %s" % shard['host'])
                         for collection in ['tweets', 'users']:
