@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 from dateutil import parser
-from multiprocessing import Process, Queue
+from multiprocessing import Event, Process, Queue
 from pymongo import errors, MongoClient, ASCENDING, HASHED
 from random import randint
 from time import sleep
@@ -51,19 +51,21 @@ class SmallhandsListener(StreamListener):
     def process_tweet(self, data):
         try:
             tweet = self.parse_tweet(json.loads(data))
-            if 'created_at' in tweet and 'expire' in self.config.db:
-                if 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
-                    ttl_secs = randint(self.config.db.expire.min_secs, self.config.db.expire.max_secs)
-                    tweet['expire_at'] = tweet['created_at'] + timedelta(seconds=ttl_secs)
-            return tweet
+            if 'id' in tweet:
+                if 'created_at' in tweet and 'expire' in self.config.db:
+                    if 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
+                        ttl_secs = randint(self.config.db.expire.min_secs, self.config.db.expire.max_secs)
+                        tweet['expire_at'] = tweet['created_at'] + timedelta(seconds=ttl_secs)
+                return tweet
+            else:
+                raise Exception, "No 'id' field in tweet data!", None
         except Exception, e:
             return SmallhandsError("Error processing tweet: %s" % e)
 
     def on_data(self, data):
         tweet = self.process_tweet(data)
         try:
-            if 'id' in tweet:
-                self.queues['insert'].put(tweet)
+            self.queues['insert'].put(tweet)
             if 'user' in tweet and 'expire_at' in tweet:
                 tweet['user']['expire_at'] = tweet['expire_at']
                 self.queues['update'].put([{ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }])
@@ -73,7 +75,7 @@ class SmallhandsListener(StreamListener):
         except Exception, e:
             if not e.message.startswith("E11000 duplicate key"):
                 return SmallhandsError("Error writing tweet to db: %s" % e)
-
+    
     def on_error(self, e):
         msg = e
         if e == 401:
@@ -135,49 +137,53 @@ class SmallhandsDB:
 
 
 class SmallhandsInserter(Process):
-    def __init__(self, config, q):
+    def __init__(self, config, queue, stop):
         self.config = config
-        self.q = q
-        self.count = 0
+        self.queue  = queue
+        self.stop   = stop
+        self.count  = 0
         super(SmallhandsInserter, self).__init__()
 
     def run(self):
         print "[%i] Started SmallhandsInserter thread! Tremendous!" % os.getpid()
         self.conn = SmallhandsDB(self.config).connection()
-        self.db = self.conn[self.config.db.name]
-        while True:
+        self.db   = self.conn[self.config.db.name]
+        while not self.stop.is_set():
             try:
-                self.db['tweets'].insert(self.q.get())
+                self.db['tweets'].insert(self.queue.get())
                 self.count += 1
                 if (self.count % 50) == 0:
-                    print("[%i] Inserted 50 tweets to %s.tweets (total: %i, queue size: %i)" % (os.getpid(), self.config.db.name, self.count, self.q.qsize()))
+                    print("[%i] Inserted 50 tweets to %s.tweets (total: %i, queue size: %i)" % (os.getpid(), self.config.db.name, self.count, self.queue.qsize()))
             except errors.DuplicateKeyError:
                 continue
+        print "[%i] Stopped SmallhandsInserter thread" % os.getpid()
 
 
 class SmallhandsUpdater(Process):
-    def __init__(self, config, q):
+    def __init__(self, config, queue, stop):
         self.config = config
-        self.q = q
-        self.count = 0
+        self.queue  = queue
+        self.stop   = stop
+        self.count  = 0
         super(SmallhandsUpdater, self).__init__()
 
     def run(self):
         print "[%i] Started SmallhandsUpdater thread! Tremendous!" % os.getpid()
         self.conn = SmallhandsDB(self.config).connection()
         self.db = self.conn[self.config.db.name]
-        while True:
+        while not self.stop.is_set():
             try:
-                item = self.q.get()
+                item = self.queue.get()
                 if len(item) == 2:
                     find = item[0]
                     updt = item[1]
                     self.db['users'].update(find, updt, upsert=True)
                     self.count += 1
                     if (self.count % 50) == 0:
-                        print("[%i] Updated 50 users to %s.users (total: %i, queue size: %i)" % (os.getpid(), self.config.db.name, self.count, self.q.qsize()))
+                        print("[%i] Updated 50 users to %s.users (total: %i, queue size: %i)" % (os.getpid(), self.config.db.name, self.count, self.queue.qsize()))
             except Exception, e:
                 raise e
+        print "[%i] Stopped SmallhandsUpdater thread" % os.getpid()
 
 
 class SmallhandsConfig(BaseConfiguration):
@@ -206,6 +212,7 @@ class Smallhands():
         self.active_streams = []
         self.queues = { 'insert': Queue(), 'update': Queue() }
         self.workers = { 'insert': None, 'update': None }
+        self.stop_workers = Event()
 
         # Parse twitter-stream filters
         self.stream_filters = ["@realDonaldTrump"]
@@ -328,8 +335,8 @@ class Smallhands():
         auth = self.get_twitter_auth()
 
         try:
-            self.workers['insert'] = SmallhandsInserter(self.config, self.queues['insert']).start()
-            self.workers['update'] = SmallhandsUpdater(self.config, self.queues['update']).start()
+            self.workers['insert'] = SmallhandsInserter(self.config, self.queues['insert'], self.stop_workers).start()
+            self.workers['update'] = SmallhandsUpdater(self.config, self.queues['update'], self.stop_workers).start()
         except Exception, e:
             return SmallhandsError("Error starting database workers: %s" % e, True)
 
@@ -352,7 +359,14 @@ class Smallhands():
                     sleep(1)
 
     def stop(self):
-        print("\nStopping stream and exiting Smallhands. Sad!")
+        print("\nStopping stream and db workers. Exiting Smallhands. Sad!")
+        if not self.stop_workers.is_set():
+            self.stop_workers.set()
+        for name in self.workers:
+            worker = self.workers[name]
+            if worker and worker.is_alive():
+                worker.terminate()
+                worker.join()
         if len(self.active_streams) > 0:
             for stream in self.active_streams:
                 stream.disconnect()
