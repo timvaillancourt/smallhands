@@ -224,6 +224,17 @@ class Smallhands():
         print("# Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
         print("#   \"I'm going to make database testing great again. Believe me.\"\n")
 
+    def auth_conn(self, conn):
+        try:
+            if 'user' in self.config.db and 'password' in self.config.db:
+                conn[self.config.db.authdb].authenticate(
+                    self.config.db.user,
+                    self.config.db.password,
+                    source=self.config.db.authdb
+                )
+        except Exception, e:
+            return SmallhandsError("Error authenticating to: %s - %s" % (conn.address, e))
+
     def ensure_indices(self, conn, collection, sharded=False):
         try:
             db = conn[self.config.db.name]
@@ -254,7 +265,8 @@ class Smallhands():
                 try:
                     db = self.db_conn['config']
                     for shard in db.shards.find():
-                        shard_conn = SmallhandsDB(self.config, shard['host']).connection()
+                        shard_conn = MongoClient(shard['host'], replicaSet=shard['_id'], readPreference='primary')
+                        self.auth_conn(shard_conn)
                         print("\tEnabling indices on shard: %s" % shard['host'])
                         for collection in ['tweets', 'users']:
                             self.ensure_indices(shard_conn, collection, True)
