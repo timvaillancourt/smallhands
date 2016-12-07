@@ -121,8 +121,7 @@ class Smallhands():
             SmallhandsError("No Twitter stream filters!", True)
 
         print("# Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
-        print("#   \"I'm going to make database testing great again. Believe me.\"")
-        print("# Vote (if you can): www.rockthevote.com!!!\n")
+        print("#   \"I'm going to make database testing great again. Believe me.\"\n")
 
     def auth_conn(self, conn):
         try:
