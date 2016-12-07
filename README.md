@@ -7,7 +7,7 @@ A simple load generator for MongoDB using mentions of @realDonaldTrump  via the 
 1. A Twitter account
 2. A set of read-only "Twitter Apps" keys (*See: [Twitter Apps Keys](#twitter-apps-keys) steps below*)
 3. A Percona Server for MongoDB / MongoDB instance, replset or cluster
-4. Python 2.7 (*Python 2.6 and 3.x not tested*) with 'json' and 'pip' modules
+4. Python 2.7 (*Python 2.6 and 3.x not tested*) with 'pip', 'json' and 'dateutil' modules, ie: *"yum install python-pip python-json python-dateutil"* on Redhat/CentOS
 5. Pip dependencies specified in 'requirements.txt' (*installed by ["make"](#getting-started) command*)
 
 ### Twitter Apps Keys
