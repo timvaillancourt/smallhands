@@ -324,6 +324,8 @@ class Smallhands():
                 if self.db_conn:
                     self.db_conn.close()
                 self.logger.info("Smallhands stopped. Sad!")
+                if frame and code:
+                    sys.exit(1)
             except Exception, e:
                 raise e
 
