@@ -11,6 +11,7 @@ from yconf import BaseConfiguration
 import json
 import logging
 import pymongo
+import signal
 import sys
 
 __VERSION__ = "0.4"
@@ -107,6 +108,7 @@ class Smallhands():
         self.config    = self.parse_config()
         self.logger    = self.setup_logger()
         self.db_conn   = None
+        self.stopped   = False
         self.stream    = None
 
         # Parse twitter-stream filters
@@ -291,10 +293,10 @@ class Smallhands():
     def start(self):
         try:
             self.start_stream()
-            while self.stream:
-                if not self.stream.running:
+            while not self.stopped and self.stream:
+                if not self.stopped and not self.stream.running:
                     self.logger.error("Restarting streaming due to error!")
-                    self.stream.disconnect()
+                    self.stop_stream()
                     self.start_stream()
                 else:
                     sleep(1)
@@ -305,18 +307,20 @@ class Smallhands():
     def stop_stream(self):
         try:
             self.logger.info("Stopping tweet streaming")
-            if self.stream and self.stream.running:
+            if self.stream:
                 self.stream.disconnect()
         except Exception, e:
             self.logger.fatal("Error stopping streaming: %s" % e)
             raise e
 
-    def stop(self):
+    def stop(self, frame=None, code=None):
         try:
-            self.logger.info("Smallhands stopped. Sad!")
-            self.stop_stream()
-            if self.db_conn:
-                self.db_conn.close()
+            if not self.stopped:
+                self.logger.info("Smallhands stopped. Sad!")
+                self.stopped = True
+                self.stop_stream()
+                if self.db_conn:
+                    self.db_conn.close()
         except Exception, e:
             raise e
 
@@ -325,6 +329,8 @@ if __name__ == "__main__":
     smallhands = None
     try:
         smallhands = Smallhands()
+        signal.signal(signal.SIGINT, smallhands.stop)
+        signal.signal(signal.SIGTERM, smallhands.stop)
         smallhands.start()
     except Exception, e:
         sys.exit(1)
