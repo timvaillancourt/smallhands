@@ -117,7 +117,7 @@ class Smallhands():
             self.stream_filters = self.config.twitter.filters.split(",")
         if len(self.stream_filters) < 1:
             self.logger.fatal("No Twitter stream filters!")
-            sys.exit(1)
+            raise e
 
         self.logger.info("Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
         self.logger.info("\t\t\"I'm going to make database testing great again. Believe me.\"")
@@ -140,7 +140,7 @@ class Smallhands():
             return self.logger
         except Exception, e:
             print('Error setting up logger: %s' % e)
-            sys.exit(1)
+            raise e
 
     def auth_conn(self, conn):
         try:
@@ -210,7 +210,7 @@ class Smallhands():
                     try:
                         self.logger.debug("Sharding collection '%s.%s'" % (self.config.db.name, collection))
                         db = self.db_conn['admin']
-                        db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': HASHED } })
+                        db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': pymongo.HASHED } })
                     except Exception, e:
                         if not e.message.startswith("sharding already enabled for collection"):
                             raise e
@@ -225,7 +225,7 @@ class Smallhands():
             return db
         except Exception, e:
             self.logger.fatal("Error setting up db: %s" % e)
-            raise e
+            raise Exception, 'MongoDB connection error - %s' % e, None
 
     def get_twitter_auth(self):
         try:
