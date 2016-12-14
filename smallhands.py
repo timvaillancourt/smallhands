@@ -182,10 +182,10 @@ class Smallhands():
     
                 # Setup indices, setup TTL index conditionally:
                 if self.db_conn.is_mongos:
-                    self.logger.info("Detected 'mongos' process, enabling sharding of smallhands documents")
+                    self.logger.info("Detected 'mongos' process. Using sharded mode")
     
                     try:
-                        self.logger.debug("Enabling sharding of db: %s" % self.config.db.name)
+                        self.logger.info("Ensuring sharding is enabled for db: %s" % self.config.db.name)
                         db = self.db_conn['admin']
                         db.command({ 'enableSharding': self.config.db.name })
                     except pymongo.errors.OperationFailure, e:
@@ -200,7 +200,7 @@ class Smallhands():
                         for shard in db.shards.find():
                             shard_conn = pymongo.MongoClient(shard['host'], replicaSet=shard['_id'], readPreference='primary')
                             self.auth_conn(shard_conn)
-                            self.logger.info("Checking indices on shard: %s" % shard['host'])
+                            self.logger.info("Ensuring indices on shard: %s" % shard['host'])
                             for collection in ['tweets', 'users']:
                                 self.logger.debug("Ensuring shard indices for '%s.%s'" % (self.config.db.name, collection))
                                 self.ensure_indices(shard_conn, collection, True)
@@ -212,7 +212,7 @@ class Smallhands():
     
                     for collection in ['tweets', 'users']:
                         try:
-                            self.logger.debug("Sharding collection '%s.%s'" % (self.config.db.name, collection))
+                            self.logger.info("Ensuring collection is sharded: '%s.%s'" % (self.config.db.name, collection))
                             db = self.db_conn['admin']
                             db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': pymongo.HASHED } })
                         except pymongo.errors.OperationFailure, e:
@@ -220,11 +220,8 @@ class Smallhands():
                                 raise e
                         except Exception, e:
                             raise e
-    
-                    db = self.db_conn[self.config.db.name]
                 else:
-                    db = self.db_conn[self.config.db.name]
-                    self.logger.info("Checking indices on: '%s:%i'" % (self.config.db.host, self.config.db.port))
+                    self.logger.info("Ensuring indices on: '%s:%i'" % (self.config.db.host, self.config.db.port))
                     for collection in ['tweets', 'users']:
                         self.logger.debug("Ensuring indices for '%s.%s'" % (self.config.db.name, collection))
                         self.ensure_indices(self.db_conn, collection)
@@ -320,15 +317,15 @@ class Smallhands():
             raise e
 
     def stop(self, frame=None, code=None):
-        try:
-            if not self.stopped:
-                self.logger.info("Smallhands stopped. Sad!")
+        if not self.stopped:
+            try:
                 self.stopped = True
                 self.stop_stream()
                 if self.db_conn:
                     self.db_conn.close()
-        except Exception, e:
-            raise e
+                self.logger.info("Smallhands stopped. Sad!")
+            except Exception, e:
+                raise e
 
 
 if __name__ == "__main__":
