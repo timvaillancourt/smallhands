@@ -78,7 +78,7 @@ class SmallhandsListener(StreamListener):
         elif e == 429:
             msg = "429 Too Many Requests"
             return sleep(5)
-        self.logger.error("Twitter Streaming API error: '%s'" % msg, True)
+        self.logger.error("Twitter Streaming API error: '%s'" % msg)
 
 
 class SmallhandsConfig(BaseConfiguration):
@@ -125,8 +125,9 @@ class Smallhands():
     def setup_logger(self):
         try:
             if self.config.verbose:
-                if not isinstance(self.config.verbose, str) or not self.config.verbose.startswith("false"):
-                    self.log_level = logging.DEBUG 
+                if self.config.verbose:
+                    if not isinstance(self.config.verbose, str) or self.config.verbose.startswith("true"):
+                        self.log_level = logging.DEBUG 
             self.logger = logging.getLogger(__name__)
             stream_log  = logging.StreamHandler()
             formatter   = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(threadName)s] [%(module)s:%(lineno)d] %(message)s')
