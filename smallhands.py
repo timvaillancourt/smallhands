@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 from dateutil import parser
-from pymongo import MongoClient, ASCENDING, HASHED
 from random import randint
 from time import sleep
 from tweepy import Stream, OAuthHandler
@@ -10,22 +9,19 @@ from tweepy.streaming import StreamListener
 from yconf import BaseConfiguration
 
 import json
+import logging
+import pymongo
+import signal
 import sys
 
-__VERSION__ = "0.3"
+__VERSION__ = "0.4"
     
-
-class SmallhandsError():
-    def __init__(self, error, do_exit=False):
-        print("I know errors. I've got the best errors:\t\"%s\"" % error)
-        if do_exit:
-            sys.exit(1)
-
 
 class SmallhandsListener(StreamListener):
     def __init__(self, db, config):
         self.db     = db
         self.config = config
+        self.logger = logging.getLogger(__name__)
         self.count  = 0
 
     def parse_tweet(self, data):
@@ -43,7 +39,7 @@ class SmallhandsListener(StreamListener):
                     parsed.append(self.parse_tweet(item))
             return parsed
         except Exception, e:
-            return SmallhandsError("Error parsing tweet: %s" % e)
+            self.logger.error("Error parsing tweet: %s" % e)
 
     def process_tweet(self, data):
         try:
@@ -54,7 +50,7 @@ class SmallhandsListener(StreamListener):
                     tweet['expire_at'] = tweet['created_at'] + timedelta(seconds=ttl_secs)
             return tweet
         except Exception, e:
-            return SmallhandsError("Error processing tweet: %s" % e)
+            self.logger.error("Error processing tweet: %s" % e)
 
     def on_data(self, data):
         tweet = self.process_tweet(data)
@@ -66,10 +62,11 @@ class SmallhandsListener(StreamListener):
                 self.db['users'].update_one({ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }, upsert=True)
             self.count += 1
             if (self.count % 50) == 0:
-                print("Wrote 50 tweets (total: %i)" % self.count)
+                self.logger.info("Wrote 50 tweets (total: %i)" % self.count)
+        except pymongo.errors.DuplicateKeyError, e:
+            pass
         except Exception, e:
-            if not e.message.startswith("E11000 duplicate key"):
-                return SmallhandsError("Error writing tweet to db: %s" % e)
+            self.logger.error("Error writing tweet to db: %s" % e)
 
     def on_error(self, e):
         msg = e
@@ -81,11 +78,7 @@ class SmallhandsListener(StreamListener):
         elif e == 429:
             msg = "429 Too Many Requests"
             return sleep(5)
-        return SmallhandsError("Twitter Streaming API error: '%s'" % msg, True)
-
-    def on_exception(self, exception):
-        print('got exception: %s' % exception)
-        sleep(1)
+        self.logger.error("Twitter Streaming API error: '%s'" % msg, True)
 
 
 class SmallhandsConfig(BaseConfiguration):
@@ -104,50 +97,82 @@ class SmallhandsConfig(BaseConfiguration):
         parser.add_argument("-T", "--twitter-access-token", dest="twitter.access.token", help="Twitter Access Token (REQUIRED)")
         parser.add_argument("-S", "--twitter-access-secret", dest="twitter.access.secret", help="Twitter Access Secret (REQUIRED)")
         parser.add_argument("-F", "--twitter-filters", dest="twitter.filters", help="Comma-separated list of filters to Twitter stream (default: @realDonaldTrump)")
+        parser.add_argument("-l", "--log-file", dest="log_file", help="Output to log file", type=str, default=None)
+        parser.add_argument("-v", "--verbose", dest="verbose", help="Verbose/debug output (default: false)", default=False, action="store_true")
         return parser
 
 
 class Smallhands():
-    def __init__(self):
-        self.config  = self.parse_config()
-        self.db_conn = None
-        self.active_streams = []
+    def __init__(self, log_level=logging.INFO):
+        self.log_level = log_level
+        self.config    = self.parse_config()
+        self.logger    = self.setup_logger()
+        self.db_conn   = None
+        self.stopped   = False
+        self.stream    = None
 
         # Parse twitter-stream filters
         self.stream_filters = ["@realDonaldTrump"]
         if 'filters' in self.config.twitter:
             self.stream_filters = self.config.twitter.filters.split(",")
         if len(self.stream_filters) < 1:
-            SmallhandsError("No Twitter stream filters!", True)
+            self.logger.fatal("No Twitter stream filters!")
+            raise e
 
-        print("# Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
-        print("#   \"I'm going to make database testing great again. Believe me.\"\n")
+        self.logger.info("Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
+        self.logger.info("\t\t\"I'm going to make database testing great again. Believe me.\"")
+
+    def setup_logger(self):
+        try:
+            if self.config.verbose:
+                if not isinstance(self.config.verbose, str) or not self.config.verbose.startswith("false"):
+                    self.log_level = logging.DEBUG 
+            self.logger = logging.getLogger(__name__)
+            stream_log  = logging.StreamHandler()
+            formatter   = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(threadName)s] [%(module)s:%(lineno)d] %(message)s')
+            stream_log.setFormatter(formatter)
+            self.logger.addHandler(stream_log)
+            if self.config.log_file:
+                file_log = logging.FileHandler(self.config.log_file)
+                file_log.setFormatter(formatter)
+                self.logger.addHandler(file_log)
+            self.logger.setLevel(self.log_level)
+            return self.logger
+        except Exception, e:
+            print('Error setting up logger: %s' % e)
+            raise e
 
     def auth_conn(self, conn):
         try:
             if 'user' in self.config.db and 'password' in self.config.db:
+                self.logger.debug("Authenticating db connection as user: %s" % self.config.db.user)
                 conn[self.config.db.authdb].authenticate(
                     self.config.db.user,
                     self.config.db.password,
                     source=self.config.db.authdb
                 )
         except Exception, e:
-            return SmallhandsError("Error authenticating to: %s - %s" % (conn.address, e))
+            self.logger.fatal("Error authenticating to: %s:%i - %s" % (self.config.db.host, self.config.db.port, e))
 
     def ensure_indices(self, conn, collection, sharded=False):
         try:
             db = conn[self.config.db.name]
-            db[collection].create_index([("id", ASCENDING)], unique=True)
+            self.logger.debug("Ensuring 'id' index on '%s.%s'" % (self.config.db.name, collection))
+            db[collection].create_index([("id", pymongo.ASCENDING)], unique=True)
             if sharded:
-                db[collection].create_index([('id', HASHED)])
+                self.logger.debug("Ensuring optional hashed 'id' index on '%s.%s' (for sharding)" % (self.config.db.name, collection))
+                db[collection].create_index([('id', pymongo.HASHED)])
             if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
-                db[collection].create_index([("expire_at", ASCENDING)], expireAfterSeconds=0)
+                self.logger.debug("Ensuring optional TTL-expiry 'expire_at' index on '%s.%s'" % (self.config.db.name, collection))
+                db[collection].create_index([("expire_at", pymongo.ASCENDING)], expireAfterSeconds=0)
         except Exception, e:
-            return SmallhandsError("Error creating collections on: %s.%s - %s" % (self.config.db.name, collection, e))
+            self.logger.fatal("Error creating collections on: '%s.%s' - %s" % (self.config.db.name, collection, e))
+            raise e
 
     def get_db(self):
         try:
-            self.db_conn = MongoClient(
+            self.logger.debug("Getting mongo connection to '%s:%i'" % (self.config.db.host, self.config.db.port))
+            self.db_conn = pymongo.MongoClient(
                 self.config.db.host,
                 self.config.db.port
             )
@@ -155,9 +180,10 @@ class Smallhands():
 
             # Setup indices, setup TTL index conditionally:
             if self.db_conn.is_mongos:
-                print("Detected 'mongos' process, enabling sharding of smallhands documents")
+                self.logger.info("Detected 'mongos' process, enabling sharding of smallhands documents")
 
                 try:
+                    self.logger.debug("Enabling sharding of db: %s" % self.config.db.name)
                     db = self.db_conn['admin']
                     db.command({ 'enableSharding': self.config.db.name })
                 except Exception, e:
@@ -168,10 +194,11 @@ class Smallhands():
                 try:
                     db = self.db_conn['config']
                     for shard in db.shards.find():
-                        shard_conn = MongoClient(shard['host'], replicaSet=shard['_id'], readPreference='primary')
+                        shard_conn = pymongo.MongoClient(shard['host'], replicaSet=shard['_id'], readPreference='primary')
                         self.auth_conn(shard_conn)
-                        print("\tEnabling indices on shard: %s" % shard['host'])
+                        self.logger.info("Checking indices on shard: %s" % shard['host'])
                         for collection in ['tweets', 'users']:
+                            self.logger.debug("Ensuring shard indices for '%s.%s'" % (self.config.db.name, collection))
                             self.ensure_indices(shard_conn, collection, True)
                 except Exception, e:
                     raise e
@@ -181,8 +208,9 @@ class Smallhands():
 
                 for collection in ['tweets', 'users']:
                     try:
+                        self.logger.debug("Sharding collection '%s.%s'" % (self.config.db.name, collection))
                         db = self.db_conn['admin']
-                        db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': HASHED } })
+                        db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': pymongo.HASHED } })
                     except Exception, e:
                         if not e.message.startswith("sharding already enabled for collection"):
                             raise e
@@ -190,15 +218,18 @@ class Smallhands():
                 db = self.db_conn[self.config.db.name]
             else:
                 db = self.db_conn[self.config.db.name]
-                print("Enabling indices on: %s" % self.db_conn.address)
+                self.logger.info("Checking indices on: '%s:%i'" % (self.config.db.host, self.config.db.port))
                 for collection in ['tweets', 'users']:
+                    self.logger.debug("Ensuring indices for '%s.%s'" % (self.config.db.name, collection))
                     self.ensure_indices(self.db_conn, collection)
             return db
         except Exception, e:
-            return SmallhandsError("Error setting up db: %s" % e, True)
+            self.logger.fatal("Error setting up db: %s" % e)
+            raise Exception, 'MongoDB connection error - %s' % e, None
 
     def get_twitter_auth(self):
         try:
+            self.logger.debug("Authenticating Twitter API session")
             auth = OAuthHandler(
                 self.config.twitter.consumer.key,
                 self.config.twitter.consumer.secret
@@ -209,7 +240,8 @@ class Smallhands():
             )
             return auth
         except Exception, e:
-            return SmallhandsError("Error with Twitter auth: %s" % e, True)
+            self.logger.fatal("Error with Twitter auth: %s" % e)
+            raise e
 
     def parse_config(self):
         try:
@@ -243,45 +275,65 @@ class Smallhands():
                 raise Exception, 'Required "twitter" auth key/secret info not set! Please set via config file or command line!', None
             return config
         except Exception, e:
-            return SmallhandsError("Error parsing config: %s" % e, True)
+            print("Error parsing config: %s" % e)
+            raise e
 
-    def start(self):
+    def start_stream(self):
         db   = self.get_db()
         auth = self.get_twitter_auth()
 
         # Start the stream
         try:
-            print("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (self.stream_filters, self.config.db.host, self.config.db.port))
-            stream = Stream(auth, SmallhandsListener(db, self.config))
-            stream.filter(track=self.stream_filters, async=True)
-            self.active_streams.append(stream)
-            return self.wait_streams()
+            self.logger.info("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (self.stream_filters, self.config.db.host, self.config.db.port))
+            self.stream = Stream(auth, SmallhandsListener(db, self.config))
+            self.stream.filter(track=self.stream_filters, async=True)
         except Exception, e:
-            return SmallhandsError("Error with Twitter Streaming: %s" % e, True)
+            raise e
 
-    def wait_streams(self):
-        while len(self.active_streams) > 0:
-            for stream in self.active_streams:
-                if not stream.running:
-                    self.active_streams.remove(stream)
+    def start(self):
+        try:
+            self.start_stream()
+            while not self.stopped and self.stream:
+                if not self.stopped and not self.stream.running:
+                    self.logger.error("Restarting streaming due to error!")
+                    self.stop_stream()
+                    self.start_stream()
                 else:
                     sleep(1)
+        except Exception, e:
+            self.logger.fatal("Error with Twitter Streaming: %s" % e)
+            raise e
 
-    def stop(self):
-        print("\nStopping stream and exiting Smallhands. Sad!")
-        if len(self.active_streams) > 0:
-            for stream in self.active_streams:
-                stream.disconnect()
-            self.wait_streams()
-        if self.db_conn:
-            self.db_conn.close()
+    def stop_stream(self):
+        try:
+            self.logger.info("Stopping tweet streaming")
+            if self.stream:
+                self.stream.disconnect()
+        except Exception, e:
+            self.logger.fatal("Error stopping streaming: %s" % e)
+            raise e
+
+    def stop(self, frame=None, code=None):
+        try:
+            if not self.stopped:
+                self.logger.info("Smallhands stopped. Sad!")
+                self.stopped = True
+                self.stop_stream()
+                if self.db_conn:
+                    self.db_conn.close()
+        except Exception, e:
+            raise e
 
 
 if __name__ == "__main__":
     smallhands = None
     try:
         smallhands = Smallhands()
+        signal.signal(signal.SIGINT, smallhands.stop)
+        signal.signal(signal.SIGTERM, smallhands.stop)
         smallhands.start()
-    except:
+    except Exception, e:
+        sys.exit(1)
+    finally:
         if smallhands:
             smallhands.stop()
