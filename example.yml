@@ -1,4 +1,6 @@
 production:
+  log_file: /tmp/smallhands.log
+  verbose: false
   db:
     host: localhost
     port: 27017
