@@ -169,64 +169,65 @@ class Smallhands():
             self.logger.fatal("Error creating collections on: '%s.%s' - %s" % (self.config.db.name, collection, e))
             raise e
 
-    def get_db(self):
+    def get_db(self, force=False):
         try:
-            self.logger.debug("Getting mongo connection to '%s:%i'" % (self.config.db.host, self.config.db.port))
-            self.db_conn = pymongo.MongoClient(
-                self.config.db.host,
-                self.config.db.port
-            )
-            self.auth_conn(self.db_conn)
-
-            # Setup indices, setup TTL index conditionally:
-            if self.db_conn.is_mongos:
-                self.logger.info("Detected 'mongos' process, enabling sharding of smallhands documents")
-
-                try:
-                    self.logger.debug("Enabling sharding of db: %s" % self.config.db.name)
-                    db = self.db_conn['admin']
-                    db.command({ 'enableSharding': self.config.db.name })
-                except pymongo.errors.OperationFailure, e:
-                    if e.code != 23:
-                        raise e
-                except Exception, e:
-                    raise e
-
-                shard_conn = None
-                try:
-                    db = self.db_conn['config']
-                    for shard in db.shards.find():
-                        shard_conn = pymongo.MongoClient(shard['host'], replicaSet=shard['_id'], readPreference='primary')
-                        self.auth_conn(shard_conn)
-                        self.logger.info("Checking indices on shard: %s" % shard['host'])
-                        for collection in ['tweets', 'users']:
-                            self.logger.debug("Ensuring shard indices for '%s.%s'" % (self.config.db.name, collection))
-                            self.ensure_indices(shard_conn, collection, True)
-                except Exception, e:
-                    raise e
-                finally:
-                    if shard_conn:
-                        shard_conn.close()
-
-                for collection in ['tweets', 'users']:
+            if force or not self.db_conn:
+                self.logger.debug("Getting mongo connection to '%s:%i'" % (self.config.db.host, self.config.db.port))
+                self.db_conn = pymongo.MongoClient(
+                    self.config.db.host,
+                    self.config.db.port
+                )
+                self.auth_conn(self.db_conn)
+    
+                # Setup indices, setup TTL index conditionally:
+                if self.db_conn.is_mongos:
+                    self.logger.info("Detected 'mongos' process, enabling sharding of smallhands documents")
+    
                     try:
-                        self.logger.debug("Sharding collection '%s.%s'" % (self.config.db.name, collection))
+                        self.logger.debug("Enabling sharding of db: %s" % self.config.db.name)
                         db = self.db_conn['admin']
-                        db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': pymongo.HASHED } })
+                        db.command({ 'enableSharding': self.config.db.name })
                     except pymongo.errors.OperationFailure, e:
-                        if e.code != 20:
+                        if e.code != 23:
                             raise e
                     except Exception, e:
                         raise e
-
-                db = self.db_conn[self.config.db.name]
-            else:
-                db = self.db_conn[self.config.db.name]
-                self.logger.info("Checking indices on: '%s:%i'" % (self.config.db.host, self.config.db.port))
-                for collection in ['tweets', 'users']:
-                    self.logger.debug("Ensuring indices for '%s.%s'" % (self.config.db.name, collection))
-                    self.ensure_indices(self.db_conn, collection)
-            return db
+    
+                    shard_conn = None
+                    try:
+                        db = self.db_conn['config']
+                        for shard in db.shards.find():
+                            shard_conn = pymongo.MongoClient(shard['host'], replicaSet=shard['_id'], readPreference='primary')
+                            self.auth_conn(shard_conn)
+                            self.logger.info("Checking indices on shard: %s" % shard['host'])
+                            for collection in ['tweets', 'users']:
+                                self.logger.debug("Ensuring shard indices for '%s.%s'" % (self.config.db.name, collection))
+                                self.ensure_indices(shard_conn, collection, True)
+                    except Exception, e:
+                        raise e
+                    finally:
+                        if shard_conn:
+                            shard_conn.close()
+    
+                    for collection in ['tweets', 'users']:
+                        try:
+                            self.logger.debug("Sharding collection '%s.%s'" % (self.config.db.name, collection))
+                            db = self.db_conn['admin']
+                            db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': pymongo.HASHED } })
+                        except pymongo.errors.OperationFailure, e:
+                            if e.code != 20:
+                                raise e
+                        except Exception, e:
+                            raise e
+    
+                    db = self.db_conn[self.config.db.name]
+                else:
+                    db = self.db_conn[self.config.db.name]
+                    self.logger.info("Checking indices on: '%s:%i'" % (self.config.db.host, self.config.db.port))
+                    for collection in ['tweets', 'users']:
+                        self.logger.debug("Ensuring indices for '%s.%s'" % (self.config.db.name, collection))
+                        self.ensure_indices(self.db_conn, collection)
+            return self.db_conn[self.config.db.name]
         except Exception, e:
             self.logger.fatal("Error setting up db: %s" % e)
             raise Exception, 'MongoDB connection error - %s' % e, None
