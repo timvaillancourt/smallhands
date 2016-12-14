@@ -186,9 +186,11 @@ class Smallhands():
                     self.logger.debug("Enabling sharding of db: %s" % self.config.db.name)
                     db = self.db_conn['admin']
                     db.command({ 'enableSharding': self.config.db.name })
-                except Exception, e:
-                    if not e.message.startswith("sharding already enabled for database"):
+                except pymongo.errors.OperationFailure, e:
+                    if e.code != 23:
                         raise e
+                except Exception, e:
+                    raise e
 
                 shard_conn = None
                 try:
@@ -211,9 +213,11 @@ class Smallhands():
                         self.logger.debug("Sharding collection '%s.%s'" % (self.config.db.name, collection))
                         db = self.db_conn['admin']
                         db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': pymongo.HASHED } })
-                    except Exception, e:
-                        if not e.message.startswith("sharding already enabled for collection"):
+                    except pymongo.errors.OperationFailure, e:
+                        if e.code != 20:
                             raise e
+                    except Exception, e:
+                        raise e
 
                 db = self.db_conn[self.config.db.name]
             else:
