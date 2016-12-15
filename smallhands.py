@@ -126,9 +126,8 @@ class Smallhands():
     def setup_logger(self):
         try:
             if self.config.verbose:
-                if self.config.verbose:
-                    if not isinstance(self.config.verbose, str) or self.config.verbose.startswith("true"):
-                        self.log_level = logging.DEBUG 
+                if not isinstance(self.config.verbose, str) or self.config.verbose.startswith("true"):
+                    self.log_level = logging.DEBUG 
             self.logger = logging.getLogger(__name__)
             stream_log  = logging.StreamHandler()
             formatter   = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(threadName)s] [%(module)s:%(lineno)d] %(message)s')
