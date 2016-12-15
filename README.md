@@ -16,7 +16,7 @@ Smallhands requires Twitter API auth keys. You will need to register a new read-
 
 ## Disclaimer
 
-The test data is likely to contain sexist, racist and generally offensive or incorrect statements.
+The test tweet data is likely to contain offensive material, false information, etc.
 
 ## Getting Started
 ```

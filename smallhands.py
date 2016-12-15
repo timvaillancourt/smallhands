@@ -18,11 +18,11 @@ __VERSION__ = "0.4"
     
 
 class SmallhandsListener(StreamListener):
-    def __init__(self, db, config):
+    def __init__(self, db, config, count=0):
         self.db     = db
         self.config = config
+        self.count  = count
         self.logger = logging.getLogger(__name__)
-        self.count  = 0
 
     def parse_tweet(self, data):
         try:
@@ -84,6 +84,8 @@ class SmallhandsListener(StreamListener):
 class SmallhandsConfig(BaseConfiguration):
     def makeParser(self):
         parser = super(SmallhandsConfig, self).makeParser()
+        parser.add_argument("-v", "--verbose", dest="verbose", help="Verbose/debug output (default: false)", default=False, action="store_true")
+        parser.add_argument("-l", "--log-file", dest="log_file", help="Output to log file", type=str, default=None)
         parser.add_argument("-H", "--db-host", dest="db.host", help="MongoDB hostname/ip")
         parser.add_argument("-P", "--db-port", dest="db.port", type=int, help="MongoDB TCP port")
         parser.add_argument("-D", "--db-name", dest="db.name", help="MongoDB Database name (default: smallhands)")
@@ -97,8 +99,7 @@ class SmallhandsConfig(BaseConfiguration):
         parser.add_argument("-T", "--twitter-access-token", dest="twitter.access.token", help="Twitter Access Token (REQUIRED)")
         parser.add_argument("-S", "--twitter-access-secret", dest="twitter.access.secret", help="Twitter Access Secret (REQUIRED)")
         parser.add_argument("-F", "--twitter-filters", dest="twitter.filters", help="Comma-separated list of filters to Twitter stream (default: @realDonaldTrump)")
-        parser.add_argument("-l", "--log-file", dest="log_file", help="Output to log file", type=str, default=None)
-        parser.add_argument("-v", "--verbose", dest="verbose", help="Verbose/debug output (default: false)", default=False, action="store_true")
+        parser.add_argument("--twitter-stream-timeout", dest="twitter.stream.timeout", help="Timeout for Twitter Streaming API, in seconds (default: 30)", default=30, type=int)
         return parser
 
 
@@ -288,7 +289,7 @@ class Smallhands():
         # Start the stream
         try:
             self.logger.info("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (self.stream_filters, self.config.db.host, self.config.db.port))
-            self.stream = Stream(auth, SmallhandsListener(db, self.config))
+            self.stream = Stream(auth, SmallhandsListener(db, self.config), timeout=self.config.twitter.stream.timeout)
             self.stream.filter(track=self.stream_filters, async=True)
         except Exception, e:
             raise e

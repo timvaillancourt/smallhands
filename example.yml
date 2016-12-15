@@ -11,6 +11,8 @@ production:
       min_secs: 172800
       max_secs: 432000
   twitter:
+    stream:
+      timeout: 30
     consumer:
       key: consumer-key-required-here
       secret: consumer-secret-required-here
