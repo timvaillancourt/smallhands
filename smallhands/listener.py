@@ -40,6 +40,9 @@ class SmallhandsListener(StreamListener):
     def process_tweet(self, data):
         try:
             tweet = self.parse_tweet(json.loads(data))
+            if not 'id' in tweet:
+                self.logger.warn("No 'id' field in tweet data, skipping")
+                return None
             if 'created_at' in tweet and 'expire' in self.config.db:
                 if 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
                     ttl_secs = randint(self.config.db.expire.min_secs, self.config.db.expire.max_secs)
@@ -50,20 +53,21 @@ class SmallhandsListener(StreamListener):
 
     def on_data(self, data):
         tweet = self.process_tweet(data)
+        now = time()
+        if int(now) >= int(self.last_report_time) + self.config.report_interval:
+            count = self.count - self.last_report_count
+            tps = float(count) / float(self.config.report_interval)
+            self.logger.info("Processed %i tweets (total: %i) in %i seconds (%f per sec)" % (count, self.count, self.config.report_interval, tps))
+            self.last_report_count = self.count
+            self.last_report_time  = now
         try:
-            now = time()
-            if int(now) >= int(self.last_report_time) + self.config.report_interval:
-                count = self.count - self.last_report_count
-                tps = float(count) / float(self.config.report_interval)
-                self.logger.info("Processed %i tweets (total: %i) in %i seconds (%f per sec)" % (count, self.count, self.config.report_interval, tps))
-                self.last_report_count = self.count
-                self.last_report_time  = now
-            self.db['tweets'].insert(tweet)
-            if 'user' in tweet:
-                if 'expire_at' in tweet:
-                    tweet['user']['expire_at'] = tweet['expire_at']
-                self.db['users'].update_one({ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }, upsert=True)
-            self.count += 1
+            if tweet:
+                self.db['tweets'].insert(tweet)
+                if 'user' in tweet:
+                    if 'expire_at' in tweet:
+                        tweet['user']['expire_at'] = tweet['expire_at']
+                    self.db['users'].update_one({ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }, upsert=True)
+                self.count += 1
         except pymongo.errors.DuplicateKeyError, e:
             pass
         except Exception, e:

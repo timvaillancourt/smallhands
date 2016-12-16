@@ -8,7 +8,7 @@ from tweepy import Stream, OAuthHandler
 from smallhands import SmallhandsConfig, SmallhandsListener
 
 
-__VERSION__ = "0.4"
+__VERSION__ = "0.5"
     
 
 class Smallhands():
@@ -28,9 +28,6 @@ class Smallhands():
             self.logger.fatal("No Twitter stream filters!")
             raise Exception, "No Twitter stream filters!", None
 
-        self.logger.info("Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
-        self.logger.info("\t\"I'm going to make database testing great again. Believe me.\"")
-
     def setup_logger(self):
         try:
             if self.config.verbose:
@@ -38,7 +35,7 @@ class Smallhands():
                     self.log_level = logging.DEBUG 
             self.logger = logging.getLogger()
             stream_log  = logging.StreamHandler()
-            formatter   = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(threadName)s] [%(module)s:%(lineno)d] %(message)s')
+            formatter   = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(threadName)s] [%(module)s.%(funcName)s:%(lineno)d] %(message)s')
             stream_log.setFormatter(formatter)
             self.logger.addHandler(stream_log)
             if self.config.log_file:
@@ -202,6 +199,8 @@ class Smallhands():
             raise e
 
     def start(self):
+        self.logger.info("Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
+        self.logger.info("\t\t\"I'm going to make database testing great again. Believe me.\"")
         try:
             self.start_stream()
             while not self.stopped and self.stream:
