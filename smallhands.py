@@ -3,7 +3,7 @@
 from datetime import timedelta
 from dateutil import parser
 from random import randint
-from time import sleep
+from time import sleep, time
 from tweepy import Stream, OAuthHandler
 from tweepy.streaming import StreamListener
 from yconf import BaseConfiguration
@@ -23,6 +23,9 @@ class SmallhandsListener(StreamListener):
         self.config = config
         self.count  = count
         self.logger = logging.getLogger(__name__)
+
+        self.last_report_time  = int(time())
+        self.last_report_count = self.count
 
     def parse_tweet(self, data):
         try:
@@ -55,14 +58,19 @@ class SmallhandsListener(StreamListener):
     def on_data(self, data):
         tweet = self.process_tweet(data)
         try:
+            now = time()
+            if int(now) >= int(self.last_report_time) + self.config.report_interval:
+                count = self.count - self.last_report_count
+                tps = float(count) / float(self.config.report_interval)
+                self.logger.info("Processed %i tweets (total: %i) in %i seconds (%f per sec)" % (count, self.count, self.config.report_interval, tps))
+                self.last_report_count = self.count
+                self.last_report_time  = now
             self.db['tweets'].insert(tweet)
             if 'user' in tweet:
                 if 'expire_at' in tweet:
                     tweet['user']['expire_at'] = tweet['expire_at']
                 self.db['users'].update_one({ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }, upsert=True)
             self.count += 1
-            if (self.count % 50) == 0:
-                self.logger.info("Wrote 50 tweets (total: %i)" % self.count)
         except pymongo.errors.DuplicateKeyError, e:
             pass
         except Exception, e:
@@ -86,6 +94,7 @@ class SmallhandsConfig(BaseConfiguration):
         parser = super(SmallhandsConfig, self).makeParser()
         parser.add_argument("-v", "--verbose", dest="verbose", help="Verbose/debug output (default: false)", default=False, action="store_true")
         parser.add_argument("-l", "--log-file", dest="log_file", help="Output to log file", type=str, default=None)
+        parser.add_argument("-R", "--report-interval", dest="report_interval", help="Interval in seconds for report updates", type=int, default=30)
         parser.add_argument("-H", "--db-host", dest="db.host", help="MongoDB hostname/ip")
         parser.add_argument("-P", "--db-port", dest="db.port", type=int, help="MongoDB TCP port")
         parser.add_argument("-D", "--db-name", dest="db.name", help="MongoDB Database name (default: smallhands)")
