@@ -4,6 +4,7 @@ import pymongo
 import sys
 
 from datetime import timedelta
+from dateutil import parser
 from random import randint
 from time import sleep, time
 from tweepy.streaming import StreamListener

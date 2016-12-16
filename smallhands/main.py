@@ -26,7 +26,7 @@ class Smallhands():
             self.stream_filters = self.config.twitter.filters.split(",")
         if len(self.stream_filters) < 1:
             self.logger.fatal("No Twitter stream filters!")
-            raise e
+            raise Exception, "No Twitter stream filters!", None
 
         self.logger.info("Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
         self.logger.info("\t\"I'm going to make database testing great again. Believe me.\"")
@@ -36,7 +36,7 @@ class Smallhands():
             if self.config.verbose:
                 if not isinstance(self.config.verbose, str) or self.config.verbose.startswith("true"):
                     self.log_level = logging.DEBUG 
-            self.logger = logging.getLogger(__name__)
+            self.logger = logging.getLogger()
             stream_log  = logging.StreamHandler()
             formatter   = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(threadName)s] [%(module)s:%(lineno)d] %(message)s')
             stream_log.setFormatter(formatter)
