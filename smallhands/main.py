@@ -1,5 +1,6 @@
 import logging
 import pymongo
+import signal
 import sys
 
 from time import sleep
@@ -19,6 +20,10 @@ class Smallhands():
         self.db_conn   = None
         self.stopped   = False
         self.stream    = None
+
+        # sig handlers
+        signal.signal(signal.SIGINT, self.stop)
+        signal.signal(signal.SIGTERM, self.stop)
 
         # Parse twitter-stream filters
         self.stream_filters = ["@realDonaldTrump"]

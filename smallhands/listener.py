@@ -41,7 +41,7 @@ class SmallhandsListener(StreamListener):
         try:
             tweet = self.parse_tweet(json.loads(data))
             if not 'id' in tweet:
-                self.logger.warn("No 'id' field in tweet data, skipping")
+                raise Exception, "No 'id' field in tweet data, skipping", None
                 return None
             if 'created_at' in tweet and 'expire' in self.config.db:
                 if 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
@@ -57,7 +57,7 @@ class SmallhandsListener(StreamListener):
         if int(now) >= int(self.last_report_time) + self.config.report_interval:
             count = self.count - self.last_report_count
             tps = float(count) / float(self.config.report_interval)
-            self.logger.info("Processed %i tweets (total: %i) in %i seconds (%f per sec)" % (count, self.count, self.config.report_interval, tps))
+            self.logger.info("Processed %i tweets (%f per sec, stream total: %i) in the last %i seconds" % (count, tps, self.count, self.config.report_interval))
             self.last_report_count = self.count
             self.last_report_time  = now
         try:
