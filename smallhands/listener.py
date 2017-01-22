@@ -41,7 +41,6 @@ class SmallhandsListener(StreamListener):
         try:
             tweet = self.parse_tweet(json.loads(data))
             if not 'id' in tweet:
-                raise Exception, "No 'id' field in tweet data, skipping", None
                 return None
             if 'created_at' in tweet and 'expire' in self.config.db:
                 if 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
@@ -52,8 +51,8 @@ class SmallhandsListener(StreamListener):
             self.logger.error("Error processing tweet: %s" % e)
 
     def on_data(self, data):
+        now   = time()
         tweet = self.process_tweet(data)
-        now = time()
         if int(now) >= int(self.last_report_time) + self.config.report_interval:
             count = self.count - self.last_report_count
             tps = float(count) / float(self.config.report_interval)
@@ -75,12 +74,13 @@ class SmallhandsListener(StreamListener):
 
     def on_error(self, e):
         msg = e
-        if e == 401:
-            msg = "401 Unauthorized: Authentication credentials were missing or incorrect"
-        elif e == 420:
-            msg = "420 Rate limiting"
-            return sleep(3)
-        elif e == 429:
-            msg = "429 Too Many Requests"
-            return sleep(5)
+	errors = {
+	     401: "401 Unauthorized: Authentication credentials were missing or incorrect",
+	     420: "420 Rate limiting",
+	     429: "429 Too Many Requests"
+	}
+	if e in errors:
+            msg = errors[e]
         self.logger.error("Twitter Streaming API error: '%s'" % msg)
+	if e >= 420:
+            sleep(3)
