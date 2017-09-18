@@ -19,4 +19,4 @@ production:
     access:
       key: access-key-required-here
       secret: access-secret-required-here
-    filters: "@realDonaldTrump"
+    filters: "@realDonaldTrump,@POTUS"
