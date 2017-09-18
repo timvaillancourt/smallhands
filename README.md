@@ -24,7 +24,6 @@ The test tweet data is likely to contain offensive material, false information, 
 ```
 git clone https://github.com/timvaillancourt/smallhands
 cd smallhands
-pip install -r requirements.txt
 make
 cp example.yml config.yml
 # (edit config.yml for your situation)
