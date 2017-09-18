@@ -1,7 +1,6 @@
 import json
 import logging
 import pymongo
-import sys
 
 from datetime import timedelta
 from dateutil import parser
@@ -10,7 +9,7 @@ from time import sleep, time
 from tweepy.streaming import StreamListener
 
 
-class SmallhandsListener(StreamListener):
+class Listener(StreamListener):
     def __init__(self, db, config, count=0):
         self.db     = db
         self.config = config
@@ -40,7 +39,7 @@ class SmallhandsListener(StreamListener):
     def process_tweet(self, data):
         try:
             tweet = self.parse_tweet(json.loads(data))
-            if not 'id' in tweet:
+            if 'id' not in tweet:
                 return None
             if 'created_at' in tweet and 'expire' in self.config.db:
                 if 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
@@ -65,7 +64,11 @@ class SmallhandsListener(StreamListener):
                 if 'user' in tweet:
                     if 'expire_at' in tweet:
                         tweet['user']['expire_at'] = tweet['expire_at']
-                    self.db['users'].update_one({ 'id': tweet['user']['id'] }, { '$set' : tweet['user'] }, upsert=True)
+                    self.db['users'].update_one(
+                        {'id': tweet['user']['id']},
+                        {'$set': tweet['user']},
+                        upsert=True
+                    )
                 self.count += 1
         except pymongo.errors.DuplicateKeyError, e:
             pass
@@ -74,13 +77,13 @@ class SmallhandsListener(StreamListener):
 
     def on_error(self, e):
         msg = e
-	errors = {
-	     401: "401 Unauthorized: Authentication credentials were missing or incorrect",
-	     420: "420 Rate limiting",
-	     429: "429 Too Many Requests"
-	}
-	if e in errors:
+        errors = {
+            401: "401 Unauthorized: Authentication credentials were missing or incorrect",
+            420: "420 Rate limiting",
+            429: "429 Too Many Requests"
+        }
+        if e in errors:
             msg = errors[e]
         self.logger.error("Twitter Streaming API error: '%s'" % msg)
-	if e >= 420:
+        if e >= 420:
             sleep(3)

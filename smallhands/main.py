@@ -1,16 +1,16 @@
 import logging
 import pymongo
 import signal
+import smallhands.config
+import smallhands.listener
 import sys
 
 from time import sleep
 from tweepy import Stream, OAuthHandler
 
-from smallhands import SmallhandsConfig, SmallhandsListener
-
 
 __VERSION__ = "0.5"
-    
+
 
 class Smallhands():
     def __init__(self, log_level=logging.INFO):
@@ -37,7 +37,7 @@ class Smallhands():
         try:
             if self.config.verbose:
                 if not isinstance(self.config.verbose, str) or self.config.verbose.startswith("true"):
-                    self.log_level = logging.DEBUG 
+                    self.log_level = logging.DEBUG
             self.logger = logging.getLogger()
             stream_log  = logging.StreamHandler()
             formatter   = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(threadName)s] [%(module)s.%(funcName)s:%(lineno)d] %(message)s')
@@ -89,21 +89,21 @@ class Smallhands():
                     self.config.db.port
                 )
                 self.auth_conn(self.db_conn)
-    
+
                 # Setup indices, setup TTL index conditionally:
                 if self.db_conn.is_mongos:
                     self.logger.info("Detected 'mongos' process. Using sharded mode")
-    
+
                     try:
                         self.logger.info("Ensuring sharding is enabled for db: %s" % self.config.db.name)
                         db = self.db_conn['admin']
-                        db.command({ 'enableSharding': self.config.db.name })
+                        db.command({'enableSharding': self.config.db.name})
                     except pymongo.errors.OperationFailure, e:
                         if e.code != 23:
                             raise e
                     except Exception, e:
                         raise e
-    
+
                     shard_conn = None
                     try:
                         db = self.db_conn['config']
@@ -119,12 +119,12 @@ class Smallhands():
                     finally:
                         if shard_conn:
                             shard_conn.close()
-    
+
                     for collection in ['tweets', 'users']:
                         try:
                             self.logger.info("Ensuring collection is sharded: '%s.%s'" % (self.config.db.name, collection))
                             db = self.db_conn['admin']
-                            db.command({ 'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': { 'id': pymongo.HASHED } })
+                            db.command({'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': {'id': pymongo.HASHED}})
                         except pymongo.errors.OperationFailure, e:
                             if e.code != 20:
                                 raise e
@@ -158,7 +158,7 @@ class Smallhands():
 
     def parse_config(self):
         try:
-            config = SmallhandsConfig()
+            config = smallhands.config.Config()
             config.parse(sys.argv[1:])
 
             # Set defaults:
@@ -181,7 +181,7 @@ class Smallhands():
                 ]
                 for field in required:
                     try:
-                        test = field
+                        test = field  # NOQA
                     except Exception, e:
                         raise Exception, 'Required config field "%s" not specified!' % field, None
             else:
@@ -198,7 +198,7 @@ class Smallhands():
         # Start the stream
         try:
             self.logger.info("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (self.stream_filters, self.config.db.host, self.config.db.port))
-            self.stream = Stream(auth, SmallhandsListener(db, self.config), timeout=self.config.twitter.stream.timeout)
+            self.stream = Stream(auth, smallhands.listener.Listener(db, self.config), timeout=self.config.twitter.stream.timeout)
             self.stream.filter(track=self.stream_filters, async=True)
         except Exception, e:
             raise e

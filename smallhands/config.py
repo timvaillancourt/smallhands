@@ -1,9 +1,11 @@
+import smallhands.config
+
 from yconf import BaseConfiguration
 
 
-class SmallhandsConfig(BaseConfiguration):
+class Config(BaseConfiguration):
     def makeParser(self):
-        parser = super(SmallhandsConfig, self).makeParser()
+        parser = super(smallhands.config.Config, self).makeParser()
         parser.add_argument("-v", "--verbose", dest="verbose", help="Verbose/debug output (default: false)", default=False, action="store_true")
         parser.add_argument("-l", "--log-file", dest="log_file", help="Output to log file", type=str, default=None)
         parser.add_argument("-R", "--report-interval", dest="report_interval", help="Interval in seconds for report updates", type=int, default=30)
