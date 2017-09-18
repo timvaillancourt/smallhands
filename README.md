@@ -1,5 +1,6 @@
 # smallhands
 !["Release"](https://github-release-version.herokuapp.com/github/timvaillancourt/smallhands/release.svg?style=flat)
+[![Build Status](https://travis-ci.org/timvaillancourt/smallhands.svg?branch=master)](https://travis-ci.org/timvaillancourt/smallhands)
 
 A simple load generator for MongoDB using mentions of @realDonaldTrump  via the Twitter Streaming API.
 !["make run"](https://github.com/timvaillancourt/smallhands/blob/master/screenshots/run.png)
