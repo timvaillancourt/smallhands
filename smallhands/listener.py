@@ -10,9 +10,10 @@ from tweepy.streaming import StreamListener
 
 
 class Listener(StreamListener):
-    def __init__(self, db, config, count=0):
+    def __init__(self, db, config, queues, count=0):
         self.db     = db
         self.config = config
+        self.queues = queues
         self.count  = count
         self.logger = logging.getLogger(__name__)
 
@@ -60,6 +61,8 @@ class Listener(StreamListener):
             self.last_report_time  = now
         try:
             if tweet:
+                if (self.count % 10) == 0:
+                    self.queues['find'].put({'id': tweet['id']})
                 self.db['tweets'].insert(tweet)
                 if 'user' in tweet:
                     if 'expire_at' in tweet:

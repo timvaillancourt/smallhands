@@ -3,8 +3,10 @@ import pymongo
 import signal
 import smallhands.config
 import smallhands.listener
+import smallhands.worker
 import sys
 
+from multiprocessing import Event, Queue
 from time import sleep
 from tweepy import Stream, OAuthHandler
 
@@ -20,6 +22,16 @@ class Smallhands():
         self.db_conn   = None
         self.stopped   = False
         self.stream    = None
+
+        self.do_stop = Event()
+        self.workers = {}
+        self.queues  = {
+            'aggregate': Queue(),
+            'find': Queue(),
+            'insert': Queue(),
+            'update': Queue(),
+            'remove': Queue()
+        }
 
         # sig handlers
         signal.signal(signal.SIGINT, self.stop)
@@ -197,17 +209,41 @@ class Smallhands():
 
         # Start the stream
         try:
-            self.logger.info("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (self.stream_filters, self.config.db.host, self.config.db.port))
-            self.stream = Stream(auth, smallhands.listener.Listener(db, self.config), timeout=self.config.twitter.stream.timeout)
+            self.logger.info("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (
+                self.stream_filters,
+                self.config.db.host,
+                self.config.db.port
+            ))
+            listener = smallhands.listener.Listener(
+                db,
+                self.config,
+                self.queues
+            )
+            self.stream = Stream(
+                auth,
+                listener,
+                timeout=self.config.twitter.stream.timeout
+            )
             self.stream.filter(track=self.stream_filters, async=True)
         except Exception, e:
             raise e
+
+    def start_workers(self):
+        # Point-find worker
+        self.workers['find'] = smallhands.worker.Find(
+            self.config,
+            self.queues['find'],
+            self.do_stop,
+            0.50
+        )
+        self.workers['find'].start()
 
     def start(self):
         self.logger.info("Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
         self.logger.info("\t\t\"I'm going to make database testing great again. Believe me.\"")
         try:
             self.start_stream()
+            self.start_workers()
             while not self.stopped and self.stream:
                 if not self.stopped and not self.stream.running:
                     self.logger.error("Restarting streaming due to error!")
@@ -233,6 +269,10 @@ class Smallhands():
             try:
                 self.stopped = True
                 self.stop_stream()
+                self.do_stop.set()
+                #for worker in self.workers:
+                #    if self.workers[worker].is_alive():
+                #        self.workers[worker].terminate()
                 if self.db_conn:
                     self.db_conn.close()
                 self.logger.info("Smallhands stopped. Sad!")
