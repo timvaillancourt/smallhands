@@ -17,7 +17,7 @@ class Find(Process):
         while not self.do_stop.is_set():
             queued = self.queue.qsize()
             if queued > self.min_queued:
-                data = self.queue.get(False, 1)
+                data = self.queue.get_nowait()
                 if data:
                     print("find: %s (queued=%i)" % (data, queued - self.min_queued))
         logging.info("Stopped point .find() worker")
