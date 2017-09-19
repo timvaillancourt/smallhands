@@ -61,9 +61,9 @@ class Listener(StreamListener):
             self.last_report_time  = now
         try:
             if tweet:
+                self.db['tweets'].insert(tweet)
                 if (self.count % 10) == 0:
                     self.queues['find'].put({'id': tweet['id']})
-                self.db['tweets'].insert(tweet)
                 if 'user' in tweet:
                     if 'expire_at' in tweet:
                         tweet['user']['expire_at'] = tweet['expire_at']
