@@ -270,9 +270,9 @@ class Smallhands():
                 self.stopped = True
                 self.stop_stream()
                 self.do_stop.set()
-                #for worker in self.workers:
-                #    if self.workers[worker].is_alive():
-                #        self.workers[worker].terminate()
+#                for worker in self.workers:
+#                    if self.workers[worker].is_alive():
+#                        self.workers[worker].terminate()
                 if self.db_conn:
                     self.db_conn.close()
                 self.logger.info("Smallhands stopped. Sad!")
