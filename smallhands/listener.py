@@ -64,6 +64,8 @@ class Listener(StreamListener):
                 self.db['tweets'].insert(tweet)
                 if (self.count % 10) == 0:
                     self.queues['find'].put({'id': tweet['id']})
+                if (self.count % 30) == 0:
+                    self.queues['remove'].put({'id': tweet['id']})
                 if 'user' in tweet:
                     if 'expire_at' in tweet:
                         tweet['user']['expire_at'] = tweet['expire_at']

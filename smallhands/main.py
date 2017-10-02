@@ -98,7 +98,8 @@ class Smallhands():
                 self.logger.debug("Getting mongo connection to '%s:%i'" % (self.config.db.host, self.config.db.port))
                 self.db_conn = pymongo.MongoClient(
                     self.config.db.host,
-                    self.config.db.port
+                    self.config.db.port,
+                    connect=False
                 )
                 self.auth_conn(self.db_conn)
 
@@ -229,14 +230,24 @@ class Smallhands():
             raise e
 
     def start_workers(self):
+        db = self.get_db()
+
         # Point-find worker
         self.workers['find'] = smallhands.worker.Find(
-            self.config,
+            db,
             self.queues['find'],
-            self.do_stop,
-            0.50
+            self.do_stop
         )
         self.workers['find'].start()
+
+        # Remove worker
+        self.workers['remove'] = smallhands.worker.Remove(
+            db,
+            self.queues['remove'],
+            self.do_stop
+        )
+        self.workers['remove'].start()
+
 
     def start(self):
         self.logger.info("Starting Smallhands version: %s (https://github.com/timvaillancourt/smallhands)" % __VERSION__)
