@@ -1,9 +1,10 @@
 import logging
 import pymongo
 import signal
-import smallhands.config
-import smallhands.listener
 import sys
+
+import smallhands.config as cnf
+import smallhands.listener as listener
 
 from time import sleep
 from tweepy import Stream, OAuthHandler
@@ -158,7 +159,7 @@ class Smallhands():
 
     def parse_config(self):
         try:
-            config = smallhands.config.Config()
+            config = cnf.Config()
             config.parse(sys.argv[1:])
 
             # Set defaults:
@@ -198,7 +199,7 @@ class Smallhands():
         # Start the stream
         try:
             self.logger.info("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (self.stream_filters, self.config.db.host, self.config.db.port))
-            self.stream = Stream(auth, smallhands.listener.Listener(db, self.config), timeout=self.config.twitter.stream.timeout)
+            self.stream = Stream(auth, listener.Listener(db, self.config), timeout=self.config.twitter.stream.timeout)
             self.stream.filter(track=self.stream_filters, async=True)
         except Exception, e:
             raise e
