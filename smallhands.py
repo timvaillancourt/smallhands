@@ -9,7 +9,7 @@ if __name__ == "__main__":
     try:
         sh = smallhands.Smallhands()
         sh.start()
-    except Exception, e:
+    except Exception as e:
         sys.exit(1)
     finally:
         if sh:
