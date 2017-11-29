@@ -32,7 +32,7 @@ class Smallhands():
             self.stream_filters = self.config.twitter.filters.split(",")
         if len(self.stream_filters) < 1:
             self.logger.fatal("No Twitter stream filters!")
-            raise Exception, "No Twitter stream filters!", None
+            raise (Exception, "No Twitter stream filters!", None)
 
     def setup_logger(self):
         try:
@@ -50,7 +50,7 @@ class Smallhands():
                 self.logger.addHandler(file_log)
             self.logger.setLevel(self.log_level)
             return self.logger
-        except Exception, e:
+        except Exception as e:
             print('Error setting up logger: %s' % e)
             raise e
 
@@ -63,7 +63,7 @@ class Smallhands():
                     self.config.db.password,
                     source=self.config.db.authdb
                 )
-        except Exception, e:
+        except Exception as e:
             self.logger.fatal("Error authenticating to: %s:%i - %s" % (self.config.db.host, self.config.db.port, e))
 
     def ensure_indices(self, conn, collection, sharded=False):
@@ -77,7 +77,7 @@ class Smallhands():
             if 'expire' in self.config.db and 'min_secs' in self.config.db.expire and 'max_secs' in self.config.db.expire:
                 self.logger.debug("Ensuring optional TTL-expiry 'expire_at' index on '%s.%s'" % (self.config.db.name, collection))
                 db[collection].create_index([("expire_at", pymongo.ASCENDING)], expireAfterSeconds=0)
-        except Exception, e:
+        except Exception as e:
             self.logger.fatal("Error creating collections on: '%s.%s' - %s" % (self.config.db.name, collection, e))
             raise e
 
@@ -99,10 +99,10 @@ class Smallhands():
                         self.logger.info("Ensuring sharding is enabled for db: %s" % self.config.db.name)
                         db = self.db_conn['admin']
                         db.command({'enableSharding': self.config.db.name})
-                    except pymongo.errors.OperationFailure, e:
+                    except pymongo.errors.OperationFailure as e:
                         if e.code != 23:
                             raise e
-                    except Exception, e:
+                    except Exception as e:
                         raise e
 
                     shard_conn = None
@@ -115,7 +115,7 @@ class Smallhands():
                             for collection in ['tweets', 'users']:
                                 self.logger.debug("Ensuring shard indices for '%s.%s'" % (self.config.db.name, collection))
                                 self.ensure_indices(shard_conn, collection, True)
-                    except Exception, e:
+                    except Exception as e:
                         raise e
                     finally:
                         if shard_conn:
@@ -126,10 +126,10 @@ class Smallhands():
                             self.logger.info("Ensuring collection is sharded: '%s.%s'" % (self.config.db.name, collection))
                             db = self.db_conn['admin']
                             db.command({'shardCollection': '%s.%s' % (self.config.db.name, collection), 'key': {'id': pymongo.HASHED}})
-                        except pymongo.errors.OperationFailure, e:
+                        except pymongo.errors.OperationFailure as e:
                             if e.code != 20:
                                 raise e
-                        except Exception, e:
+                        except Exception as e:
                             raise e
                 else:
                     self.logger.info("Ensuring indices on: '%s:%i'" % (self.config.db.host, self.config.db.port))
@@ -137,9 +137,9 @@ class Smallhands():
                         self.logger.debug("Ensuring indices for '%s.%s'" % (self.config.db.name, collection))
                         self.ensure_indices(self.db_conn, collection)
             return self.db_conn[self.config.db.name]
-        except Exception, e:
+        except Exception as e:
             self.logger.fatal("Error setting up db: %s" % e)
-            raise Exception, 'MongoDB connection error - %s' % e, None
+            raise (Exception, 'MongoDB connection error - %s' % e, None)
 
     def get_twitter_auth(self):
         try:
@@ -153,7 +153,7 @@ class Smallhands():
                 self.config.twitter.access.secret
             )
             return auth
-        except Exception, e:
+        except Exception as e:
             self.logger.fatal("Error with Twitter auth: %s" % e)
             raise e
 
@@ -183,12 +183,12 @@ class Smallhands():
                 for field in required:
                     try:
                         test = field  # NOQA
-                    except Exception, e:
-                        raise Exception, 'Required config field "%s" not specified!' % field, None
+                    except Exception as e:
+                        raise (Exception, 'Required config field "%s" not specified!' % field, None)
             else:
-                raise Exception, 'Required "twitter" auth key/secret info not set! Please set via config file or command line!', None
+                raise (Exception, 'Required "twitter" auth key/secret info not set! Please set via config file or command line!', None)
             return config
-        except Exception, e:
+        except Exception as e:
             print("Error parsing config: %s" % e)
             raise e
 
@@ -201,7 +201,7 @@ class Smallhands():
             self.logger.info("Listening to Twitter Streaming API for mentions of: %s, writing data to: '%s:%i'" % (self.stream_filters, self.config.db.host, self.config.db.port))
             self.stream = Stream(auth, listener.Listener(db, self.config), timeout=self.config.twitter.stream.timeout)
             self.stream.filter(track=self.stream_filters, async=True)
-        except Exception, e:
+        except Exception as e:
             raise e
 
     def start(self):
@@ -216,7 +216,7 @@ class Smallhands():
                     self.start_stream()
                 else:
                     sleep(1)
-        except Exception, e:
+        except Exception as e:
             self.logger.fatal("Error with Twitter Streaming: %s" % e)
             raise e
 
@@ -225,7 +225,7 @@ class Smallhands():
             self.logger.info("Stopping tweet streaming")
             if self.stream:
                 self.stream.disconnect()
-        except Exception, e:
+        except Exception as e:
             self.logger.fatal("Error stopping streaming: %s" % e)
             raise e
 
@@ -239,5 +239,5 @@ class Smallhands():
                 self.logger.info("Smallhands stopped. Sad!")
                 if frame and code:
                     sys.exit(1)
-            except Exception, e:
+            except Exception as e:
                 raise e

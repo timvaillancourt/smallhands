@@ -33,7 +33,7 @@ class Listener(StreamListener):
                 for item in data:
                     parsed.append(self.parse_tweet(item))
             return parsed
-        except Exception, e:
+        except Exception as e:
             self.logger.error("Error parsing tweet: %s" % e)
 
     def process_tweet(self, data):
@@ -46,7 +46,7 @@ class Listener(StreamListener):
                     ttl_secs = randint(self.config.db.expire.min_secs, self.config.db.expire.max_secs)
                     tweet['expire_at'] = tweet['created_at'] + timedelta(seconds=ttl_secs)
             return tweet
-        except Exception, e:
+        except Exception as e:
             self.logger.error("Error processing tweet: %s" % e)
 
     def on_data(self, data):
@@ -70,9 +70,9 @@ class Listener(StreamListener):
                         upsert=True
                     )
                 self.count += 1
-        except pymongo.errors.DuplicateKeyError, e:
+        except pymongo.errors.DuplicateKeyError as e:
             pass
-        except Exception, e:
+        except Exception as e:
             self.logger.error("Error writing tweet to db: %s" % e)
 
     def on_error(self, e):
