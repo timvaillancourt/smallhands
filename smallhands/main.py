@@ -10,7 +10,7 @@ from time import sleep
 from tweepy import Stream, OAuthHandler
 
 
-__VERSION__ = "0.5"
+__VERSION__ = "0.6"
 
 
 class Smallhands():
