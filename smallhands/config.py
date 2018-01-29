@@ -17,7 +17,7 @@ class Config(yconf.BaseConfiguration):
         parser.add_argument("-X", "--db-expire-max", dest="db.expire.max", type=int, help="(Optional) maximum MongoDB TTL expiry in seconds")
         parser.add_argument("-k", "--twitter-consumer-key", dest="twitter.consumer.key", help="Twitter Consumer Key (REQUIRED)")
         parser.add_argument("-s", "--twitter-consumer-secret", dest="twitter.consumer.secret", help="Twitter Consumer Secret (REQUIRED)")
-        parser.add_argument("-T", "--twitter-access-token", dest="twitter.access.token", help="Twitter Access Token (REQUIRED)")
+        parser.add_argument("-T", "--twitter-access-key", dest="twitter.access.key", help="Twitter Access Key (REQUIRED)")
         parser.add_argument("-S", "--twitter-access-secret", dest="twitter.access.secret", help="Twitter Access Secret (REQUIRED)")
         parser.add_argument("-F", "--twitter-filters", dest="twitter.filters", help="Comma-separated list of filters to Twitter stream (default: @realDonaldTrump,@POTUS)")
         parser.add_argument("--twitter-stream-timeout", dest="twitter.stream.timeout", help="Timeout for Twitter Streaming API, in seconds (default: 30)", default=30, type=int)
