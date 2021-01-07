@@ -2,7 +2,7 @@
 !["Release"](https://github-release-version.herokuapp.com/github/timvaillancourt/smallhands/release.svg?style=flat)
 [![Build Status](https://travis-ci.org/timvaillancourt/smallhands.svg?branch=master)](https://travis-ci.org/timvaillancourt/smallhands)
 
-A simple load generator for MongoDB using mentions of @realDonaldTrump  via the Twitter Streaming API.
+A simple load generator for MongoDB using mentions of @realDonaldTrump via the Twitter Streaming API.
 !["make run"](https://github.com/timvaillancourt/smallhands/blob/master/screenshots/run.png)
 
 ## Required
@@ -15,6 +15,10 @@ A simple load generator for MongoDB using mentions of @realDonaldTrump  via the 
 ### Twitter Apps Keys
 
 Smallhands requires Twitter API auth keys. You will need to register a new read-only "app" at https://apps.twitter.com to get a set of Consumer and Access auth key pairs.
+
+## Limitations
+
+Smallhands is self-interested; it frequently creates data but it is unable to read data. This makes it useful for testing inserts only.
 
 ## Disclaimer
 
