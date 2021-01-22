@@ -27,7 +27,7 @@ class Smallhands():
         signal.signal(signal.SIGTERM, self.stop)
 
         # Parse twitter-stream filters
-        self.stream_filters = ["@realDonaldTrump", "@POTUS"]
+        self.stream_filters = ["@realDonaldTrump"]
         if 'filters' in self.config.twitter:
             self.stream_filters = self.config.twitter.filters.split(",")
         if len(self.stream_filters) < 1:
