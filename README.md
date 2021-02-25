@@ -35,7 +35,7 @@ make run
 ```
 
 ## The Future...
-1. Better, trump-themed errors/handling
+1. Better, trump-themed errors/handling (*ie: `TREMENDOUS`, `SAD`, etc*)
 
 ##  Code
 I beat Python with a hammer until it works. Your improvements are appreciated!
