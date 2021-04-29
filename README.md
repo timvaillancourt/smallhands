@@ -22,7 +22,7 @@ Smallhands is self-interested; it frequently creates data but it is unable to re
 
 ## Disclaimer
 
-The test tweet data is likely to contain offensive material, false information, etc.
+The test tweet data is likely to contain unfathomably offensive material, false information, utter nonsense, etc.
 
 ## Getting Started
 ```
