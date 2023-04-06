@@ -1,5 +1,5 @@
 # smallhands
-<img src="images/smallhands.jpg" width=550>
+<img src="images/smallhands.jpg" width=500>
 
 Turns a negative into a positive by implementing a simple load generator for MongoDB using mentions of @realDonaldTrump via the Twitter Streaming API.
 !["make run"](https://github.com/timvaillancourt/smallhands/blob/master/images/run.png)
