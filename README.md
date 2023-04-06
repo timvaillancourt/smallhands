@@ -1,9 +1,8 @@
 # smallhands
-!["Release"](https://github-release-version.herokuapp.com/github/timvaillancourt/smallhands/release.svg?style=flat)
-[![Build Status](https://travis-ci.org/timvaillancourt/smallhands.svg?branch=master)](https://travis-ci.org/timvaillancourt/smallhands)
+<img src="images/smallhands.jpg" width=500>
 
 Turns a negative into a positive by implementing a simple load generator for MongoDB using mentions of @realDonaldTrump via the Twitter Streaming API.
-!["make run"](https://github.com/timvaillancourt/smallhands/blob/master/screenshots/run.png)
+!["make run"](https://github.com/timvaillancourt/smallhands/blob/master/images/run.png)
 
 ## Required
 1. A Twitter account
